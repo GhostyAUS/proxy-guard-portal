@@ -65,10 +65,10 @@ export default function Documentation() {
                     
                     <h3 className="text-lg font-medium pt-4">Architecture</h3>
                     <p>
-                      The application is based on the
-                      <a href="https://github.com/dominikwinter/nginx-forward-proxy" className="text-primary hover:underline mx-1">
+                      The application is based on the{" "}
+                      <a href="https://github.com/dominikwinter/nginx-forward-proxy" className="text-primary hover:underline">
                         nginx-forward-proxy
-                      </a>
+                      </a>{" "}
                       project and extends it with a management interface. The key components are:
                     </p>
                     
@@ -513,10 +513,10 @@ map $remote_addr $client_my-group {
                         Check the Nginx logs for detailed error information
                       </li>
                       <li>
-                        Consult the
-                        <a href="https://github.com/dominikwinter/nginx-forward-proxy" className="text-primary hover:underline mx-1">
+                        Consult the{" "}
+                        <a href="https://github.com/dominikwinter/nginx-forward-proxy" className="text-primary hover:underline">
                           nginx-forward-proxy documentation
-                        </a>
+                        </a>{" "}
                         for more information on the base project
                       </li>
                       <li>
