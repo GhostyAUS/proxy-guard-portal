@@ -1,5 +1,10 @@
+
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { Layout } from "@/components/layout/Layout";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { Home } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
@@ -9,18 +14,23 @@ const NotFound = () => {
       "404 Error: User attempted to access non-existent route:",
       location.pathname
     );
+    document.title = "Not Found | Proxy Guard";
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
+    <Layout>
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+        <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
+        <p className="text-xl mb-6">
+          Oops! The page you're looking for doesn't exist.
+        </p>
+        <Button asChild>
+          <Link to="/" className="flex items-center gap-2">
+            <Home className="h-4 w-4" /> Return to Dashboard
+          </Link>
+        </Button>
       </div>
-    </div>
+    </Layout>
   );
 };
 
