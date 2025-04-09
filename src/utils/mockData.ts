@@ -1,4 +1,3 @@
-
 import { WhitelistGroup, ProxySettings, NginxStatus } from "@/types/proxy";
 
 export const mockWhitelistGroups: WhitelistGroup[] = [
@@ -47,6 +46,7 @@ export const mockWhitelistGroups: WhitelistGroup[] = [
 export const mockProxySettings: ProxySettings = {
   nginxConfigPath: "/etc/nginx/nginx.conf",
   isReadOnly: false,
+  proxyPort: "8080",
   authType: "none",
   ldapSettings: {
     serverUrl: "ldaps://ldap.example.com:636",
