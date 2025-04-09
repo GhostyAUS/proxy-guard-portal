@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { 
@@ -429,7 +428,7 @@ map $remote_addr $client_my-group {
                     
                     <h4 className="text-md font-medium pt-3">Step 1: Clone the Repository</h4>
                     <pre className="bg-muted p-2 rounded-md text-sm mt-1">
-                      git clone https://github.com/yourusername/proxy-guard.git
+                      git clone https://github.com/GhostyAUS/proxy-guard.git
                       cd proxy-guard
                     </pre>
                     
