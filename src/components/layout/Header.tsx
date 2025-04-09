@@ -1,6 +1,7 @@
 
 import { AlertCircle, Bell, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   DropdownMenu,
@@ -8,8 +9,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 export function Header() {
+  const [hasNotifications, setHasNotifications] = useState(true);
+
+  const handleMarkAllAsRead = () => {
+    setHasNotifications(false);
+    toast.success("All notifications marked as read");
+  };
+
   return (
     <header className="sticky top-0 z-30 w-full border-b bg-background">
       <div className="flex h-16 items-center px-4 md:px-6">
@@ -32,25 +41,33 @@ export function Header() {
                 className="relative"
               >
                 <Bell className="h-4 w-4" />
-                <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-destructive" />
+                {hasNotifications && (
+                  <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-destructive" />
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
               <div className="flex items-center justify-between border-b px-4 py-2">
                 <h2 className="text-sm font-semibold">Notifications</h2>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={handleMarkAllAsRead}>
                   Mark all as read
                 </Button>
               </div>
-              <div className="flex items-center gap-4 border-b px-4 py-3">
-                <AlertCircle className="h-5 w-5 text-blue-500" />
-                <div>
-                  <p className="text-sm font-medium">Nginx configuration updated</p>
-                  <p className="text-xs text-muted-foreground">
-                    Configuration changes were successfully applied
-                  </p>
+              {hasNotifications ? (
+                <div className="flex items-center gap-4 border-b px-4 py-3">
+                  <AlertCircle className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="text-sm font-medium">Nginx configuration updated</p>
+                    <p className="text-xs text-muted-foreground">
+                      Configuration changes were successfully applied
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+                  No new notifications
+                </div>
+              )}
               <DropdownMenuItem asChild className="justify-center cursor-pointer">
                 <Link to="/notifications" className="w-full">View all</Link>
               </DropdownMenuItem>

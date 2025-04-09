@@ -29,11 +29,24 @@ export interface ProxySettings {
     bindDn: string;
     searchBase: string;
     searchFilter: string;
+    useLdaps?: boolean;
+    ldapPort?: string;
   };
   samlSettings?: {
     entityId: string;
     assertionConsumerService: string;
     idpMetadataUrl: string;
+  };
+  clientAuth?: {
+    requireAuth: boolean;
+    authMethod: 'none' | 'ldap' | 'basic';
+    realm?: string;
+    ldapUrl?: string;
+    ldapBindDn?: string;
+    ldapSearchBase?: string;
+    ldapSearchFilter?: string;
+    ldapPort?: string;
+    useLdaps?: boolean;
   };
 }
 

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Check, Save, Terminal } from "lucide-react";
+import { Check, Save, Terminal, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 import { Layout } from "@/components/layout/Layout";
@@ -35,6 +35,8 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 import { mockProxySettings, mockNginxStatus } from "@/utils/mockData";
 import { testConfigWritable } from "@/utils/nginxUtils";
@@ -49,12 +51,26 @@ const ldapSettingsSchema = z.object({
   bindDn: z.string().min(1, "Bind DN is required"),
   searchBase: z.string().min(1, "Search base is required"),
   searchFilter: z.string().min(1, "Search filter is required"),
+  useLdaps: z.boolean().optional(),
+  ldapPort: z.string().optional(),
 });
 
 const samlSettingsSchema = z.object({
   entityId: z.string().min(1, "Entity ID is required"),
   assertionConsumerService: z.string().min(1, "Assertion Consumer Service URL is required"),
   idpMetadataUrl: z.string().min(1, "IdP Metadata URL is required"),
+});
+
+const clientAuthSchema = z.object({
+  requireAuth: z.boolean(),
+  authMethod: z.enum(["none", "ldap", "basic"]),
+  realm: z.string().optional(),
+  ldapUrl: z.string().optional(),
+  ldapBindDn: z.string().optional(),
+  ldapSearchBase: z.string().optional(),
+  ldapSearchFilter: z.string().optional(),
+  ldapPort: z.string().optional(),
+  useLdaps: z.boolean().optional(),
 });
 
 export default function Settings() {
@@ -80,6 +96,8 @@ export default function Settings() {
       bindDn: settings.ldapSettings?.bindDn || "",
       searchBase: settings.ldapSettings?.searchBase || "",
       searchFilter: settings.ldapSettings?.searchFilter || "",
+      useLdaps: settings.ldapSettings?.useLdaps || false,
+      ldapPort: settings.ldapSettings?.ldapPort || "389",
     },
   });
 
@@ -89,6 +107,21 @@ export default function Settings() {
       entityId: settings.samlSettings?.entityId || "",
       assertionConsumerService: settings.samlSettings?.assertionConsumerService || "",
       idpMetadataUrl: settings.samlSettings?.idpMetadataUrl || "",
+    },
+  });
+
+  const clientAuthForm = useForm<z.infer<typeof clientAuthSchema>>({
+    resolver: zodResolver(clientAuthSchema),
+    defaultValues: {
+      requireAuth: settings.clientAuth?.requireAuth || false,
+      authMethod: settings.clientAuth?.authMethod || "none",
+      realm: settings.clientAuth?.realm || "Proxy Guard",
+      ldapUrl: settings.clientAuth?.ldapUrl || "",
+      ldapBindDn: settings.clientAuth?.ldapBindDn || "",
+      ldapSearchBase: settings.clientAuth?.ldapSearchBase || "",
+      ldapSearchFilter: settings.clientAuth?.ldapSearchFilter || "",
+      ldapPort: settings.clientAuth?.ldapPort || "389",
+      useLdaps: settings.clientAuth?.useLdaps || false,
     },
   });
 
@@ -135,6 +168,8 @@ export default function Settings() {
         bindDn: data.bindDn,
         searchBase: data.searchBase,
         searchFilter: data.searchFilter,
+        useLdaps: data.useLdaps,
+        ldapPort: data.ldapPort,
       },
     });
     toast.success("LDAP settings updated");
@@ -151,6 +186,24 @@ export default function Settings() {
       },
     });
     toast.success("SAML settings updated");
+  };
+
+  const onSaveClientAuth = (data: z.infer<typeof clientAuthSchema>) => {
+    setSettings({
+      ...settings,
+      clientAuth: {
+        requireAuth: data.requireAuth,
+        authMethod: data.authMethod,
+        realm: data.realm,
+        ldapUrl: data.ldapUrl,
+        ldapBindDn: data.ldapBindDn,
+        ldapSearchBase: data.ldapSearchBase,
+        ldapSearchFilter: data.ldapSearchFilter,
+        ldapPort: data.ldapPort,
+        useLdaps: data.useLdaps,
+      },
+    });
+    toast.success("Client authentication settings updated");
   };
 
   const handleAuthTypeChange = (value: string) => {
@@ -186,6 +239,10 @@ export default function Settings() {
       setConfigTestInProgress(false);
     }
   };
+
+  // Watch the client auth method to show/hide fields conditionally
+  const clientAuthMethod = clientAuthForm.watch("authMethod");
+  const requireClientAuth = clientAuthForm.watch("requireAuth");
 
   return (
     <Layout>
@@ -300,15 +357,54 @@ export default function Settings() {
                             <FormItem>
                               <FormLabel>LDAP Server URL</FormLabel>
                               <FormControl>
-                                <Input placeholder="ldaps://ldap.example.com:636" {...field} />
+                                <Input placeholder="ldap.example.com" {...field} />
                               </FormControl>
                               <FormDescription>
-                                URL of the LDAP server (use ldaps:// for secure connections)
+                                URL of the LDAP server (without protocol prefix)
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
+                        
+                        <div className="flex items-center gap-4">
+                          <FormField
+                            control={ldapForm.control}
+                            name="useLdaps"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                                <div>
+                                  <FormLabel>Use LDAPS (Secure LDAP)</FormLabel>
+                                  <FormDescription>
+                                    Enable to use LDAP over SSL/TLS
+                                  </FormDescription>
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={ldapForm.control}
+                            name="ldapPort"
+                            render={({ field }) => (
+                              <FormItem className="w-32">
+                                <FormLabel>LDAP Port</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder={ldapForm.watch("useLdaps") ? "636" : "389"} 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                         
                         <FormField
                           control={ldapForm.control}
@@ -431,6 +527,241 @@ export default function Settings() {
                   </TabsContent>
                 </Tabs>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Client Authentication</CardTitle>
+              <CardDescription>
+                Configure authentication requirements for clients connecting to the proxy
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...clientAuthForm}>
+                <form onSubmit={clientAuthForm.handleSubmit(onSaveClientAuth)} className="space-y-6">
+                  <FormField
+                    control={clientAuthForm.control}
+                    name="requireAuth"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Require Authentication for Proxy Access
+                          </FormLabel>
+                          <FormDescription>
+                            When enabled, clients will need to authenticate before using the proxy
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  {requireClientAuth && (
+                    <>
+                      <FormField
+                        control={clientAuthForm.control}
+                        name="authMethod"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel>Authentication Method</FormLabel>
+                            <FormControl>
+                              <RadioGroup
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                                className="flex flex-col space-y-1"
+                              >
+                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                  <FormControl>
+                                    <RadioGroupItem value="basic" />
+                                  </FormControl>
+                                  <FormLabel className="font-normal">
+                                    Basic Authentication (username/password)
+                                  </FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                  <FormControl>
+                                    <RadioGroupItem value="ldap" />
+                                  </FormControl>
+                                  <FormLabel className="font-normal">
+                                    LDAP Authentication
+                                  </FormLabel>
+                                </FormItem>
+                              </RadioGroup>
+                            </FormControl>
+                            <FormDescription>
+                              Choose how clients will authenticate to use the proxy
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={clientAuthForm.control}
+                        name="realm"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Authentication Realm</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Proxy Guard" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Realm name shown in authentication prompt
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {clientAuthMethod === "ldap" && (
+                        <>
+                          <FormField
+                            control={clientAuthForm.control}
+                            name="ldapUrl"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>LDAP Server</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="ldap.example.com" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  LDAP server for client authentication (without protocol prefix)
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="flex items-center gap-4">
+                            <FormField
+                              control={clientAuthForm.control}
+                              name="useLdaps"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                                  <FormControl>
+                                    <Switch
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                    />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Use LDAPS (Secure LDAP)</FormLabel>
+                                    <FormDescription>
+                                      Enable to use LDAP over SSL/TLS
+                                    </FormDescription>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={clientAuthForm.control}
+                              name="ldapPort"
+                              render={({ field }) => (
+                                <FormItem className="w-32">
+                                  <FormLabel>LDAP Port</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder={clientAuthForm.watch("useLdaps") ? "636" : "389"} 
+                                      {...field} 
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={clientAuthForm.control}
+                            name="ldapBindDn"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>LDAP Bind DN</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="cn=proxyuser,dc=example,dc=com" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  Service account for LDAP authentication
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={clientAuthForm.control}
+                            name="ldapSearchBase"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>LDAP Search Base</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="ou=users,dc=example,dc=com" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  Base DN for user search operations
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={clientAuthForm.control}
+                            name="ldapSearchFilter"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>LDAP Search Filter</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="(uid=&#123;&#123;username&#125;&#125;)" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  Filter to locate the user record (use &#123;&#123;username&#125;&#125; as placeholder)
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </>
+                      )}
+
+                      <Alert className="bg-amber-50 border-amber-200">
+                        <Shield className="h-4 w-4 text-amber-500" />
+                        <AlertTitle>Important Security Notice</AlertTitle>
+                        <AlertDescription>
+                          When client authentication is enabled, you should use TLS/SSL for the proxy connection to prevent credential interception.
+                        </AlertDescription>
+                      </Alert>
+                    </>
+                  )}
+
+                  <Button type="submit">
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Client Authentication Settings
+                  </Button>
+                </form>
+              </Form>
             </CardContent>
           </Card>
         </div>
