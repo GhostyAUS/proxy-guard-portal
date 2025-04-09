@@ -351,10 +351,10 @@ export default function Settings() {
                             <FormItem>
                               <FormLabel>Search Filter</FormLabel>
                               <FormControl>
-                                <Input placeholder="(uid={{username}})" {...field} />
+                                <Input placeholder="(uid=&#123;&#123;username&#125;&#125;)" {...field} />
                               </FormControl>
                               <FormDescription>
-                                Filter to locate the user record (use {{username}} as placeholder)
+                                Filter to locate the user record (use &#123;&#123;username&#125;&#125; as placeholder)
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
