@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { 
@@ -76,7 +77,7 @@ export default function Documentation() {
                         <strong>Nginx:</strong> The proxy server that handles the actual traffic forwarding
                       </li>
                       <li>
-                        <strong>Web UI:</strong> The management interface you're currently using
+                        <strong>Web UI:</strong> The management interface you&apos;re currently using
                       </li>
                       <li>
                         <strong>Configuration Generator:</strong> A system that translates the whitelist
@@ -185,7 +186,7 @@ export default function Documentation() {
                       </li>
                       <li>
                         <strong>Incorrect:</strong> <code className="bg-muted p-1 rounded">https://example.com</code> 
-                        (don't include the protocol)
+                        (don&apos;t include the protocol)
                       </li>
                     </ul>
                     
@@ -374,7 +375,7 @@ map $remote_addr $client_my-group {
                       <li>
                         Add access condition to the server block:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          if ($client_my-group = 1 && $dest_my-group = 1) { set $allow_access 1; }
+                          if ($client_my-group = 1 && $dest_my-group = 1) {"{set $allow_access 1;}"}
                         </pre>
                       </li>
                     </ol>
@@ -400,7 +401,7 @@ map $remote_addr $client_my-group {
                         <h5 className="font-medium">Problem: Client cannot access any websites through the proxy</h5>
                         <ul className="list-disc list-inside space-y-1 pl-4 pt-2">
                           <li>
-                            Verify that the client's IP address is included in at least one enabled whitelist group
+                            Verify that the client&apos;s IP address is included in at least one enabled whitelist group
                           </li>
                           <li>
                             Check that the requested destination is included in the same whitelist group
@@ -433,7 +434,7 @@ map $remote_addr $client_my-group {
                     <h4 className="text-md font-medium pt-3">Configuration Issues</h4>
                     <div className="space-y-2 pl-4">
                       <div className="border rounded-md p-3">
-                        <h5 className="font-medium">Problem: Configuration changes don't take effect</h5>
+                        <h5 className="font-medium">Problem: Configuration changes don&apos;t take effect</h5>
                         <ul className="list-disc list-inside space-y-1 pl-4 pt-2">
                           <li>
                             Check if Nginx configuration was successfully reloaded after changes
