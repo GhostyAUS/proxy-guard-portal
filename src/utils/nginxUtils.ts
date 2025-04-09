@@ -1,4 +1,3 @@
-
 import { WhitelistGroup } from "@/types/proxy";
 
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
@@ -65,7 +64,7 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
   return true;
 };
 
-// Default nginx forward proxy template
+// Updated nginx combined proxy template
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
 error_log /var/log/nginx/error.log info;
@@ -85,7 +84,16 @@ http {
 # PLACEHOLDER:MAP_BLOCKS
     
     server {
-        listen 8080;
+        listen 8080 ssl http2;
+        
+        # SSL configuration for HTTPS
+        ssl_certificate /etc/nginx/certs/server.crt;
+        ssl_certificate_key /etc/nginx/certs/server.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
         
         # Check if client is allowed to access the requested destination
         # PLACEHOLDER:ACCESS_CONDITIONS
@@ -98,8 +106,12 @@ http {
         # Forward proxy configuration
         resolver 8.8.8.8 ipv6=off;
         
-        # HTTP proxy
+        # HTTP/HTTPS proxy - handles both protocols
         location / {
+            # Authentication settings (if enabled)
+            auth_basic_user_file /etc/nginx/.htpasswd;
+            
+            # Handle HTTP and HTTPS traffic
             proxy_pass $scheme://$http_host$request_uri;
             proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -107,21 +119,10 @@ http {
             proxy_connect_timeout 60s;
             proxy_send_timeout 60s;
             proxy_read_timeout 60s;
-        }
-    }
-    
-    # HTTPS proxy - requires NGINX compiled with --with-stream
-    stream {
-        server {
-            listen 8443;
             
-            # Use preread to get SNI without decrypting
-            ssl_preread on;
-            
-            # Forward the connection
-            proxy_pass $ssl_preread_server_name:443;
-            proxy_connect_timeout 60s;
-            proxy_timeout 600s;
+            # HTTPS CONNECT method handling
+            proxy_ssl_server_name on;
+            proxy_ssl_session_reuse on;
         }
     }
 }

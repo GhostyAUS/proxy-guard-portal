@@ -23,6 +23,7 @@ export interface WhitelistGroup {
 export interface ProxySettings {
   nginxConfigPath: string;
   isReadOnly: boolean;
+  proxyPort: string; // Combined HTTP/HTTPS port
   authType: 'none' | 'ldap' | 'saml';
   ldapSettings?: {
     serverUrl: string;

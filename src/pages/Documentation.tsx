@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { 
@@ -34,6 +33,7 @@ export default function Documentation() {
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="whitelisting">Whitelisting</TabsTrigger>
                 <TabsTrigger value="manual-config">Manual Configuration</TabsTrigger>
+                <TabsTrigger value="docker">Docker Deployment</TabsTrigger>
                 <TabsTrigger value="troubleshooting">Troubleshooting</TabsTrigger>
               </TabsList>
               
@@ -386,6 +386,203 @@ map $remote_addr $client_my-group {
                       updates through the web interface. Consider using the web interface exclusively 
                       for most configuration tasks.
                     </p>
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="docker">
+                <ScrollArea className="h-[500px] rounded-md border p-4">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Docker Deployment</h3>
+                    <p>
+                      Proxy Guard can be easily deployed using Docker Compose. This allows you to run
+                      the application in a containerized environment with minimal setup.
+                    </p>
+                    
+                    <h4 className="text-md font-medium pt-3">Prerequisites</h4>
+                    <ul className="list-disc list-inside space-y-2 pl-4">
+                      <li>Docker and Docker Compose installed on your system</li>
+                      <li>Git to clone the repository</li>
+                    </ul>
+                    
+                    <h4 className="text-md font-medium pt-3">Directory Structure</h4>
+                    <p>
+                      The repository contains the following structure for Docker deployment:
+                    </p>
+                    
+                    <pre className="bg-muted p-3 rounded-md overflow-x-auto text-sm mt-2">
+{`proxy-guard/
+├── docker-compose.yml
+├── nginx/
+│   ├── Dockerfile
+│   ├── nginx.conf.template
+│   └── certs/
+│       ├── server.crt
+│       └── server.key
+├── app/
+│   ├── Dockerfile
+│   └── [application files]
+├── .env
+└── README.md`}
+                    </pre>
+                    
+                    <h4 className="text-md font-medium pt-3">Step 1: Clone the Repository</h4>
+                    <pre className="bg-muted p-2 rounded-md text-sm mt-1">
+                      git clone https://github.com/yourusername/proxy-guard.git
+                      cd proxy-guard
+                    </pre>
+                    
+                    <h4 className="text-md font-medium pt-3">Step 2: Configure Environment Variables</h4>
+                    <p>
+                      Create or edit the <code>.env</code> file to set your configuration:
+                    </p>
+                    <pre className="bg-muted p-2 rounded-md text-sm mt-1">
+{`# Proxy settings
+PROXY_PORT=8080
+NGINX_CONFIG_PATH=/etc/nginx/nginx.conf
+
+# Authentication settings
+AUTH_TYPE=none   # Options: none, ldap, saml
+LDAP_SERVER=ldap.example.com
+LDAP_PORT=389
+LDAP_USE_SSL=false
+LDAP_BIND_DN=cn=admin,dc=example,dc=com
+LDAP_SEARCH_BASE=ou=users,dc=example,dc=com
+LDAP_SEARCH_FILTER=(uid={{username}})
+
+# Client authentication (for proxy access)
+CLIENT_AUTH_REQUIRED=false
+CLIENT_AUTH_METHOD=none   # Options: none, basic, ldap
+CLIENT_AUTH_REALM=Proxy Access`}
+                    </pre>
+                    
+                    <h4 className="text-md font-medium pt-3">Step 3: SSL Certificates</h4>
+                    <p>
+                      For the combined HTTP/HTTPS proxy, you need SSL certificates:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 pl-4">
+                      <li>
+                        Place your certificates in the <code>nginx/certs/</code> directory:
+                        <ul className="list-disc list-inside space-y-1 pl-4 mt-1">
+                          <li><code>server.crt</code> - SSL certificate</li>
+                          <li><code>server.key</code> - Private key</li>
+                        </ul>
+                      </li>
+                      <li>
+                        Or generate self-signed certificates (for testing only):
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`mkdir -p nginx/certs
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout nginx/certs/server.key \
+  -out nginx/certs/server.crt \
+  -subj "/CN=proxy-guard"`}
+                        </pre>
+                      </li>
+                    </ul>
+                    
+                    <h4 className="text-md font-medium pt-3">Step 4: Start the Services</h4>
+                    <p>
+                      Launch Proxy Guard using Docker Compose:
+                    </p>
+                    <pre className="bg-muted p-2 rounded-md text-sm mt-1">
+                      docker-compose up -d
+                    </pre>
+                    
+                    <h4 className="text-md font-medium pt-3">Docker Compose File</h4>
+                    <p>
+                      Here's the <code>docker-compose.yml</code> file that defines the services:
+                    </p>
+                    <pre className="bg-muted p-3 rounded-md overflow-x-auto text-sm mt-2">
+{`version: '3'
+
+services:
+  # Web UI for proxy management
+  app:
+    build:
+      context: ./app
+    ports:
+      - "3000:3000"
+    environment:
+      - NGINX_CONFIG_PATH=/etc/nginx/nginx.conf
+    volumes:
+      - nginx_config:/etc/nginx
+    networks:
+      - proxy-network
+    depends_on:
+      - nginx-proxy
+
+  # Nginx proxy service
+  nginx-proxy:
+    build:
+      context: ./nginx
+    ports:
+      - "${PROXY_PORT:-8080}:8080"
+    volumes:
+      - nginx_config:/etc/nginx
+      - ./nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - proxy-network
+    restart: unless-stopped
+
+networks:
+  proxy-network:
+
+volumes:
+  nginx_config:`}
+                    </pre>
+                    
+                    <h4 className="text-md font-medium pt-3">Accessing the Application</h4>
+                    <p>
+                      After starting the containers:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 pl-4">
+                      <li>Access the management interface: <code>http://localhost:3000</code></li>
+                      <li>Configure your clients to use the proxy at: <code>http(s)://your-server-ip:8080</code></li>
+                    </ul>
+                    
+                    <h4 className="text-md font-medium pt-3">Basic Client Proxy Configuration</h4>
+                    <p>
+                      To use the proxy from a client machine:
+                    </p>
+                    <pre className="bg-muted p-2 rounded-md text-sm mt-1">
+{`# Linux/macOS environment variables
+export http_proxy=http://your-server-ip:8080
+export https_proxy=http://your-server-ip:8080
+
+# With authentication (if enabled)
+export http_proxy=http://username:password@your-server-ip:8080
+export https_proxy=http://username:password@your-server-ip:8080
+
+# For Windows CMD
+set http_proxy=http://your-server-ip:8080
+set https_proxy=http://your-server-ip:8080
+
+# For PowerShell
+$env:http_proxy = "http://your-server-ip:8080"
+$env:https_proxy = "http://your-server-ip:8080"`}
+                    </pre>
+                    
+                    <h4 className="text-md font-medium pt-3">Managing the Docker Environment</h4>
+                    <ul className="list-disc list-inside space-y-2 pl-4">
+                      <li>
+                        Stop the services:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+                          docker-compose down
+                        </pre>
+                      </li>
+                      <li>
+                        View logs:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+                          docker-compose logs -f
+                        </pre>
+                      </li>
+                      <li>
+                        Restart after configuration changes:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+                          docker-compose restart
+                        </pre>
+                      </li>
+                    </ul>
                   </div>
                 </ScrollArea>
               </TabsContent>
