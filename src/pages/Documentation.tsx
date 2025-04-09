@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { 
@@ -375,7 +376,7 @@ map $remote_addr $client_my-group {
                       <li>
                         Add access condition to the server block:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          if ($client_my-group = 1 && $dest_my-group = 1) {"{set $allow_access 1;}"}
+                          if ($client_my-group = 1 && $dest_my-group = 1) {`{ set $allow_access 1; }`}
                         </pre>
                       </li>
                     </ol>
@@ -472,9 +473,9 @@ CLIENT_AUTH_REALM=Proxy Access`}
                         Or generate self-signed certificates (for testing only):
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
 {`mkdir -p nginx/certs
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout nginx/certs/server.key \
-  -out nginx/certs/server.crt \
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
+  -keyout nginx/certs/server.key \\
+  -out nginx/certs/server.crt \\
   -subj "/CN=proxy-guard"`}
                         </pre>
                       </li>
@@ -516,7 +517,7 @@ services:
     build:
       context: ./nginx
     ports:
-      - "${PROXY_PORT:-8080}:8080"
+      - "\${PROXY_PORT:-8080}:8080"
     volumes:
       - nginx_config:/etc/nginx
       - ./nginx/certs:/etc/nginx/certs:ro
