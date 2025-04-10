@@ -9,10 +9,11 @@ events {
 http {
     access_log /var/log/nginx/access.log;
     
-    # Define variables for access control
+    # Define variables for access control using geo module
     set $allow_access 0;
     
-# PLACEHOLDER:ACCESS_VARIABLES
+    # Use geo module to match client IPs
+# PLACEHOLDER:GEO_BLOCKS
     
     server {
         listen 80;
@@ -26,7 +27,7 @@ http {
         ssl_session_cache shared:SSL:10m;
         ssl_session_timeout 10m;
         
-        # Check if client is allowed to access the requested destination
+        # Check allowed destinations and set access flag
 # PLACEHOLDER:ACCESS_CONDITIONS
         
         # Block access if not allowed

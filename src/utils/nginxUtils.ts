@@ -1,4 +1,3 @@
-
 import { WhitelistGroup } from "@/types/proxy";
 import axios from "axios";
 
@@ -6,8 +5,8 @@ import axios from "axios";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
- * Generates an NGINX configuration from whitelist groups using a simpler approach
- * that avoids problematic map directives
+ * Generates an NGINX configuration from whitelist groups using geo directives
+ * for IP matching and regex for host matching
  */
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
   console.log(`Generating nginx config from ${groups.length} groups`);
@@ -15,49 +14,28 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   // Start with the base template
   let config = configTemplate;
   
-  // Generate access variables
-  const accessVariables = groups.filter(g => g.enabled).flatMap(group => {
-    const variables = [];
+  // Generate geo blocks for IP matching
+  const geoBlocks = groups.filter(g => g.enabled).map(group => {
+    // For each group, create a geo block that maps IPs to variables
+    const geoBlock = `
+# Group: ${group.name}
+geo $remote_addr $client_${group.id} {
+    default 0;
+${group.clients.map(client => `    ${client.value} 1;`).join('\n')}
+}`;
     
-    // Define variables for each client IP
-    group.clients.forEach((client, idx) => {
-      variables.push(`    set $client_${group.id}_${idx} 0;`);
-    });
-    
-    // Define variables for each destination
-    group.destinations.forEach((dest, idx) => {
-      variables.push(`    set $dest_${group.id}_${idx} 0;`);
-    });
-    
-    return variables;
-  }).join('\n');
+    return geoBlock;
+  }).join('\n\n');
   
-  // Generate access conditions for the server block - a more direct approach without map
+  // Generate access conditions to check both client IP and destination
   const accessConditions = groups.filter(g => g.enabled).flatMap(group => {
-    const conditions = [];
-    
-    // Add client IP check conditions
-    group.clients.forEach((client, clientIdx) => {
-      conditions.push(`        if ($remote_addr = ${client.value}) { set $client_${group.id}_${clientIdx} 1; }`);
-    });
-    
-    // Add host check conditions
-    group.destinations.forEach((dest, destIdx) => {
-      conditions.push(`        if ($http_host ~ "${dest.value}") { set $dest_${group.id}_${destIdx} 1; }`);
-    });
-    
-    // Add combined conditions that set allow_access
-    group.clients.forEach((_, clientIdx) => {
-      group.destinations.forEach((_, destIdx) => {
-        conditions.push(`        if ($client_${group.id}_${clientIdx} = 1 && $dest_${group.id}_${destIdx} = 1) { set $allow_access 1; }`);
-      });
-    });
-    
-    return conditions;
+    return group.destinations.map(dest => 
+      `        if ($client_${group.id} = 1 && $http_host ~ "${dest.value}") { set $allow_access 1; }`
+    );
   }).join('\n');
   
   // Replace placeholders in the template
-  config = config.replace('# PLACEHOLDER:ACCESS_VARIABLES', accessVariables);
+  config = config.replace('# PLACEHOLDER:GEO_BLOCKS', geoBlocks);
   config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
   
   console.log(`Generated nginx config with ${groups.filter(g => g.enabled).length} enabled groups`);
@@ -131,7 +109,7 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
   }
 };
 
-// Updated nginx combined proxy template with simpler structure
+// Updated nginx combined proxy template with geo directives
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
 error_log /var/log/nginx/error.log info;
@@ -143,10 +121,11 @@ events {
 http {
     access_log /var/log/nginx/access.log;
     
-    # Define variables for access control
+    # Define variables for access control using geo module
     set $allow_access 0;
     
-# PLACEHOLDER:ACCESS_VARIABLES
+    # Use geo module to match client IPs
+# PLACEHOLDER:GEO_BLOCKS
     
     server {
         listen 80 ssl http2;
@@ -160,7 +139,7 @@ http {
         ssl_session_cache shared:SSL:10m;
         ssl_session_timeout 10m;
         
-        # Check if client is allowed to access the requested destination
+        # Check allowed destinations and set access flag
 # PLACEHOLDER:ACCESS_CONDITIONS
         
         # Block access if not allowed

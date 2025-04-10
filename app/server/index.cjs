@@ -1,4 +1,3 @@
-
 // Server file with CommonJS syntax
 const express = require("express");
 const app = express();
@@ -155,40 +154,29 @@ const updateNginxConfig = () => {
     const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
     console.log("Read nginx template file, generating configuration...");
     
-    // Properly formatted implementation of generateNginxConfig
-    const mapBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
-      // Generate the client IPs map
-      const clientIpsMap = group.clients.map(client => 
-        `    ${client.value} 1;`
-      ).join('\n');
-      
-      // Generate the destinations map
-      const destinationsMap = group.destinations.map(dest => 
-        `    ${dest.value} 1;`
-      ).join('\n');
-      
-      // Make sure to return properly formatted map directives
-      return `
+    // Generate geo blocks for IP matching
+    const geoBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
+      // For each group, create a geo block that maps IPs to variables
+      const geoBlock = `
 # Group: ${group.name}
-map $remote_addr $client_${group.id} {
+geo $remote_addr $client_${group.id} {
     default 0;
-${clientIpsMap}
-}
-
-map $http_host $dest_${group.id} {
-    default 0;
-${destinationsMap}
+${group.clients.map(client => `    ${client.value} 1;`).join('\n')}
 }`;
+      
+      return geoBlock;
     }).join('\n\n');
     
-    // Generate the access condition for the server block
-    const accessConditions = whitelistGroups.filter(g => g.enabled).map(group => 
-      `        if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
-    ).join('\n');
+    // Generate access conditions to check both client IP and destination
+    const accessConditions = whitelistGroups.filter(g => g.enabled).flatMap(group => {
+      return group.destinations.map(dest => 
+        `        if ($client_${group.id} = 1 && $http_host ~ "${dest.value}") { set $allow_access 1; }`
+      );
+    }).join('\n');
     
     // Replace placeholders in the template
     let config = nginxConfigTemplate;
-    config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
+    config = config.replace('# PLACEHOLDER:GEO_BLOCKS', geoBlocks);
     config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
     
     console.log("Generated NGINX config with:");
