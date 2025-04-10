@@ -9,28 +9,42 @@ const fs = require('fs');
 
 app.use(express.json());
 
-// Enable CORS for development
+// Enhanced logging middleware with request body logging
 app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  
+  // Log request body for POST/PUT requests
+  if (['POST', 'PUT'].includes(req.method) && req.body) {
+    console.log(`[${timestamp}] Request body:`, JSON.stringify(req.body, null, 2));
+  }
+  
+  // Enhanced response logging
+  const originalSend = res.send;
+  res.send = function(body) {
+    console.log(`[${timestamp}] Response status: ${res.statusCode}`);
+    
+    // Log response body for easier debugging
+    try {
+      if (body && typeof body === 'string') {
+        const parsedBody = JSON.parse(body);
+        console.log(`[${timestamp}] Response body:`, JSON.stringify(parsedBody, null, 2));
+      }
+    } catch (e) {
+      // If not JSON, log a snippet
+      console.log(`[${timestamp}] Response body (start): ${typeof body === 'string' ? body.substring(0, 100) : 'non-string response'}`);
+    }
+    
+    return originalSend.call(this, body);
+  };
+  
+  // Enable CORS for development
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
-  next();
-});
-
-// Enhanced logging middleware (place before routes)
-app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method} ${req.url}`);
-  
-  // Add response logging
-  const originalSend = res.send;
-  res.send = function(body) {
-    console.log(`[${timestamp}] Response status: ${res.statusCode}`);
-    return originalSend.call(this, body);
-  };
   
   next();
 });
@@ -94,6 +108,13 @@ const whitelistGroups = [
 // GET endpoint for whitelist groups
 app.get("/api/whitelist-groups", (req, res) => {
   console.log("Whitelist groups requested - returning:", whitelistGroups.length, "groups");
+  
+  // Log the structure of what we're returning
+  console.log("Response structure:", JSON.stringify({
+    groups: whitelistGroups.map(g => ({ id: g.id, name: g.name })) // Log just id and name to keep logs manageable
+  }, null, 2));
+  
+  // Important fix: Return proper JSON structure with groups array
   res.json({ groups: whitelistGroups });
 });
 
@@ -101,8 +122,10 @@ app.get("/api/whitelist-groups", (req, res) => {
 app.post("/api/whitelist-groups", (req, res) => {
   const group = req.body;
   console.log("Received whitelist group update request:", group.id, group.name);
+  console.log("Group details:", JSON.stringify(group, null, 2));
   
   if (!group || !group.id) {
+    console.error("Invalid whitelist group data received:", group);
     return res.status(400).json({ error: "Invalid whitelist group data" });
   }
 
@@ -120,6 +143,7 @@ app.post("/api/whitelist-groups", (req, res) => {
   try {
     // Generate NGINX config from whitelist groups
     const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
+    console.log("Read nginx template file, generating configuration...");
     
     // Simple implementation of generateNginxConfig
     const mapBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
@@ -157,29 +181,42 @@ ${destinationsMap}
     config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
     config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
     
-    // For development - log generated config
-    console.log("Generated NGINX config with access conditions:", accessConditions.length > 0 ? "Yes" : "No");
+    console.log("Generated NGINX config with:");
+    console.log(`- ${whitelistGroups.filter(g => g.enabled).length} enabled groups`);
+    console.log(`- ${accessConditions.split('\n').length} access conditions`);
     
     try {
-      // Simulate updating nginx config
-      // In a real implementation, this would write the config to the appropriate location
-      console.log("NGINX configuration would be updated");
-      // Here we would call the actual nginx service, but for now we're just simulating it
+      // Write the config to a file
+      const configPath = '/etc/nginx/nginx.conf';
+      fs.writeFileSync(configPath, config);
+      console.log("NGINX configuration successfully written to:", configPath);
       
-      // Simulate reloading nginx
-      console.log("NGINX service would be reloaded to apply new configuration");
-      
-      // Let the frontend know the update was successful
-      res.json({ success: true, group });
+      // Reload nginx
+      const { exec } = require('child_process');
+      exec('nginx -s reload', (error, stdout, stderr) => {
+        if (error) {
+          console.error("Error reloading NGINX:", error);
+          console.error("STDERR:", stderr);
+          
+          // Still return success for the group save, but indicate the NGINX config wasn't reloaded
+          res.json({ success: true, group, nginxReloaded: false, error: String(error) });
+        } else {
+          console.log("NGINX service successfully reloaded");
+          console.log("STDOUT:", stdout);
+          
+          // Let the frontend know the update was successful
+          res.json({ success: true, group, nginxReloaded: true });
+        }
+      });
     } catch (configError) {
-      console.error("Error updating NGINX config:", configError);
+      console.error("Error updating/reloading NGINX:", configError);
       // Still return success for the group save, but indicate the NGINX config wasn't updated
-      res.json({ success: true, group, nginxUpdated: false });
+      res.json({ success: true, group, nginxUpdated: false, error: String(configError) });
     }
   } catch (err) {
     console.error("Error preparing nginx config:", err);
     // Still return success for the group save
-    res.json({ success: true, group, nginxUpdated: false });
+    res.json({ success: true, group, nginxUpdated: false, error: String(err) });
   }
 });
 
@@ -190,9 +227,19 @@ app.delete("/api/whitelist-groups/:id", (req, res) => {
   
   const initialLength = whitelistGroups.length;
   const groupToDelete = whitelistGroups.find(g => g.id === id);
-  const filteredGroups = whitelistGroups.filter(g => g.id !== id);
   
-  if (filteredGroups.length < initialLength) {
+  if (!groupToDelete) {
+    console.error(`Group not found: ${id}`);
+    return res.status(404).json({ error: "Group not found", success: false });
+  }
+  
+  console.log(`Found group to delete: ${groupToDelete.name} (${groupToDelete.id})`);
+  
+  // Remove the group from the array
+  const filteredGroups = whitelistGroups.filter(g => g.id !== id);
+  const deletedCount = initialLength - filteredGroups.length;
+  
+  if (deletedCount > 0) {
     // Update the in-memory array
     whitelistGroups.length = 0;
     whitelistGroups.push(...filteredGroups);
@@ -239,30 +286,45 @@ ${destinationsMap}
       config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
       config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
       
-      // For development - log generated config
-      console.log("Generated NGINX config after deletion with access conditions:", accessConditions.length > 0 ? "Yes" : "No");
+      console.log("Generated NGINX config after deletion with:");
+      console.log(`- ${whitelistGroups.filter(g => g.enabled).length} enabled groups`);
+      console.log(`- ${accessConditions.split('\n').length} access conditions`);
       
       try {
-        // Simulate updating nginx config
-        console.log("NGINX configuration would be updated after group deletion");
+        // Write the config to a file
+        const configPath = '/etc/nginx/nginx.conf';
+        fs.writeFileSync(configPath, config);
+        console.log("NGINX configuration successfully written to:", configPath);
         
-        // Simulate reloading nginx
-        console.log("NGINX service would be reloaded to apply new configuration");
-        
-        res.json({ success: true });
+        // Reload nginx
+        const { exec } = require('child_process');
+        exec('nginx -s reload', (error, stdout, stderr) => {
+          if (error) {
+            console.error("Error reloading NGINX after deletion:", error);
+            console.error("STDERR:", stderr);
+            
+            // Still return success for the group deletion
+            res.json({ success: true, nginxReloaded: false, error: String(error) });
+          } else {
+            console.log("NGINX service successfully reloaded after deletion");
+            console.log("STDOUT:", stdout);
+            
+            res.json({ success: true });
+          }
+        });
       } catch (configError) {
-        console.error("Error updating NGINX config after deletion:", configError);
+        console.error("Error updating/reloading NGINX after deletion:", configError);
         // Still return success for the group deletion
-        res.json({ success: true, nginxUpdated: false });
+        res.json({ success: true, nginxUpdated: false, error: String(configError) });
       }
     } catch (err) {
       console.error("Error preparing nginx config after deletion:", err);
       // Still return success for the group deletion
-      res.json({ success: true, nginxUpdated: false });
+      res.json({ success: true, nginxUpdated: false, error: String(err) });
     }
   } else {
-    console.log("Whitelist group not found:", id);
-    res.status(404).json({ error: "Group not found" });
+    console.log("Whitelist group not found for deletion:", id);
+    res.status(404).json({ error: "Group not found", success: false });
   }
 });
 
@@ -281,10 +343,11 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-// Global error handler
+// Global error handler with enhanced logging
 app.use((err, req, res, next) => {
   console.error(`[ERROR] ${new Date().toISOString()}:`, err);
-  res.status(500).json({ error: "Internal server error" });
+  console.error("Stack trace:", err.stack);
+  res.status(500).json({ error: "Internal server error", message: err.message });
 });
 
 // Start server with more extensive logging
@@ -295,9 +358,11 @@ try {
     console.log(`Server time: ${new Date().toISOString()}`);
     console.log("Server endpoints:");
     console.log("  - GET /api/health");
-    console.log("  - GET/POST /api/whitelist-groups");
+    console.log("  - GET /api/whitelist-groups");
+    console.log("  - POST /api/whitelist-groups (create/update)");
     console.log("  - DELETE /api/whitelist-groups/:id");
-    console.log("  - GET/POST /api/nginx/*");
+    console.log("  - Various /api/nginx/* endpoints");
+    console.log("Current whitelist groups:", whitelistGroups.length);
   });
 } catch (error) {
   console.error("Failed to start API server:", error);

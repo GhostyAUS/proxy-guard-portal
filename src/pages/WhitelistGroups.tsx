@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowUpDown, Edit, Plus, Trash, RefreshCw } from "lucide-react";
+import { ArrowUpDown, Edit, Plus, Trash, RefreshCw, AlertCircle, Bug } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -11,7 +11,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/layout/Layout";
@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function WhitelistGroups() {
   const location = useLocation();
@@ -36,6 +37,7 @@ export default function WhitelistGroups() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteGroupItem, setDeleteGroupItem] = useState<WhitelistGroup | null>(null);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
+  const [isDebugMode, setIsDebugMode] = useState(false);
 
   useEffect(() => {
     document.title = "Whitelist Groups | Proxy Guard";
@@ -71,6 +73,7 @@ export default function WhitelistGroups() {
       if (group) {
         setToggleLoading(groupId);
         const updatedGroup = { ...group, enabled: !group.enabled };
+        console.log("Toggling group:", groupId, "to", updatedGroup.enabled);
         await updateGroup(updatedGroup);
         
         toast(
@@ -93,6 +96,7 @@ export default function WhitelistGroups() {
   const confirmDelete = async () => {
     if (deleteGroupItem) {
       try {
+        console.log("Confirming deletion of group:", deleteGroupItem.id);
         await removeGroup(deleteGroupItem.id);
         toast.success(`Group deleted`, { 
           description: `${deleteGroupItem.name} has been deleted` 
@@ -113,6 +117,10 @@ export default function WhitelistGroups() {
     fetchGroups();
   };
 
+  const toggleDebugMode = () => {
+    setIsDebugMode(!isDebugMode);
+  };
+
   const filteredGroups = groups.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -127,6 +135,9 @@ export default function WhitelistGroups() {
             <Button variant="outline" onClick={handleRefresh}>
               <RefreshCw className="mr-2 h-4 w-4" /> Refresh
             </Button>
+            <Button variant="outline" onClick={toggleDebugMode}>
+              <Bug className="mr-2 h-4 w-4" /> {isDebugMode ? "Hide Debug" : "Debug"}
+            </Button>
             <Button asChild>
               <Link to="/whitelist/create">
                 <Plus className="mr-2 h-4 w-4" /> Create Group
@@ -134,6 +145,42 @@ export default function WhitelistGroups() {
             </Button>
           </div>
         </div>
+
+        {isDebugMode && (
+          <Card className="border-yellow-400 bg-yellow-50 dark:bg-yellow-950">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Debug Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="single" collapsible>
+                <AccordionItem value="api-status">
+                  <AccordionTrigger>API Status</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="flex flex-col gap-2 text-sm">
+                      <div><strong>API Base URL:</strong> {import.meta.env.VITE_API_BASE_URL || "/api"}</div>
+                      <div><strong>Loading State:</strong> {isLoading ? "True" : "False"}</div>
+                      <div><strong>Error:</strong> {error || "None"}</div>
+                      <div><strong>Groups Count:</strong> {groups.length}</div>
+                    </div>
+                    <div className="mt-2">
+                      <Button size="sm" onClick={handleRefresh} variant="outline">
+                        Retry API Call
+                      </Button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="groups-data">
+                  <AccordionTrigger>Groups Data</AccordionTrigger>
+                  <AccordionContent>
+                    <pre className="bg-slate-100 dark:bg-slate-900 p-2 rounded text-xs overflow-auto max-h-60">
+                      {JSON.stringify(groups, null, 2)}
+                    </pre>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -158,8 +205,10 @@ export default function WhitelistGroups() {
                 <span className="ml-2">Loading whitelist groups...</span>
               </div>
             ) : error ? (
-              <div className="rounded-md bg-destructive/10 p-4 text-center">
-                <p className="text-destructive">{error}</p>
+              <div className="rounded-md bg-destructive/10 p-4 text-center flex flex-col items-center">
+                <AlertCircle className="h-6 w-6 text-destructive mb-2" />
+                <p className="text-destructive font-medium">Failed to load groups</p>
+                <p className="text-destructive/80 text-sm mb-2">{error}</p>
                 <Button 
                   variant="outline" 
                   className="mt-2"
@@ -242,6 +291,11 @@ export default function WhitelistGroups() {
               </div>
             )}
           </CardContent>
+          {filteredGroups.length > 0 && (
+            <CardFooter className="text-sm text-muted-foreground">
+              Showing {filteredGroups.length} of {groups.length} groups
+            </CardFooter>
+          )}
         </Card>
       </div>
 
