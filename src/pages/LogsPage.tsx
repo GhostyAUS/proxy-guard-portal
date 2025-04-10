@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { useLogs } from "@/contexts/LogsContext";
-import { LogStatsCard } from "@/components/logs/LogStats";
+import { LogStats } from "@/components/logs/LogStats";
 import { LogTable } from "@/components/logs/LogTable";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw } from "lucide-react";
@@ -60,7 +60,7 @@ export default function LogsPage() {
           </Button>
         </div>
 
-        <LogStatsCard 
+        <LogStats 
           stats={stats}
           isRealTimeEnabled={isRealTimeEnabled}
           onToggleRealTime={handleToggleRealTime}
