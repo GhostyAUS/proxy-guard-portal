@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Check, Save, Terminal, Shield } from "lucide-react";
+import { Check, FileText, Save, Terminal, Shield } from "lucide-react";
 import { toast } from "sonner";
 
 import { Layout } from "@/components/layout/Layout";
@@ -46,6 +45,16 @@ const nginxConfigSchema = z.object({
   nginxConfigPath: z.string().min(1, "Config path is required"),
 });
 
+const logsConfigSchema = z.object({
+  accessLogPath: z.string().min(1, "Access log path is required"),
+  errorLogPath: z.string().min(1, "Error log path is required"),
+  logLevel: z.enum(["debug", "info", "notice", "warn", "error", "crit", "alert", "emerg"]),
+  logFormat: z.string().optional(),
+  rotateLogsDaily: z.boolean().default(true),
+  compressLogs: z.boolean().default(true),
+  maxLogFiles: z.string().default("10"),
+});
+
 const ldapSettingsSchema = z.object({
   serverUrl: z.string().min(1, "LDAP server URL is required"),
   bindDn: z.string().min(1, "Bind DN is required"),
@@ -86,6 +95,19 @@ export default function Settings() {
     resolver: zodResolver(nginxConfigSchema),
     defaultValues: {
       nginxConfigPath: settings.nginxConfigPath,
+    },
+  });
+
+  const logsConfigForm = useForm<z.infer<typeof logsConfigSchema>>({
+    resolver: zodResolver(logsConfigSchema),
+    defaultValues: {
+      accessLogPath: settings.logsSettings?.accessLogPath || "/var/log/nginx/access.log",
+      errorLogPath: settings.logsSettings?.errorLogPath || "/var/log/nginx/error.log",
+      logLevel: settings.logsSettings?.logLevel || "error",
+      logFormat: settings.logsSettings?.logFormat || "",
+      rotateLogsDaily: settings.logsSettings?.rotateLogsDaily !== false,
+      compressLogs: settings.logsSettings?.compressLogs !== false,
+      maxLogFiles: settings.logsSettings?.maxLogFiles || "10",
     },
   });
 
@@ -152,6 +174,36 @@ export default function Settings() {
       }
     } catch (error) {
       toast.error("Error testing path", {
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    } finally {
+      setConfigTestInProgress(false);
+    }
+  };
+
+  const onSaveLogsConfig = async (data: z.infer<typeof logsConfigSchema>) => {
+    try {
+      setConfigTestInProgress(true);
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setSettings({
+        ...settings,
+        logsSettings: {
+          accessLogPath: data.accessLogPath,
+          errorLogPath: data.errorLogPath,
+          logLevel: data.logLevel,
+          logFormat: data.logFormat,
+          rotateLogsDaily: data.rotateLogsDaily,
+          compressLogs: data.compressLogs,
+          maxLogFiles: data.maxLogFiles,
+        }
+      });
+      
+      toast.success("Log configuration updated successfully");
+    } catch (error) {
+      toast.error("Error updating log configuration", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
       });
     } finally {
@@ -240,7 +292,6 @@ export default function Settings() {
     }
   };
 
-  // Watch the client auth method to show/hide fields conditionally
   const clientAuthMethod = clientAuthForm.watch("authMethod");
   const requireClientAuth = clientAuthForm.watch("requireAuth");
 
@@ -307,6 +358,184 @@ export default function Settings() {
                   <Button type="submit" disabled={configTestInProgress}>
                     <Save className="mr-2 h-4 w-4" />
                     Save Path
+                  </Button>
+                </CardFooter>
+              </form>
+            </Form>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Logs Configuration</CardTitle>
+              <CardDescription>
+                Configure log file paths, formats, and rotation settings
+              </CardDescription>
+            </CardHeader>
+            <Form {...logsConfigForm}>
+              <form onSubmit={logsConfigForm.handleSubmit(onSaveLogsConfig)}>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={logsConfigForm.control}
+                    name="accessLogPath"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Access Log Path</FormLabel>
+                        <FormControl>
+                          <Input placeholder="/var/log/nginx/access.log" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Path where proxy access logs will be stored
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={logsConfigForm.control}
+                    name="errorLogPath"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Error Log Path</FormLabel>
+                        <FormControl>
+                          <Input placeholder="/var/log/nginx/error.log" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Path where proxy error logs will be stored
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={logsConfigForm.control}
+                    name="logLevel"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Log Level</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select log level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="debug">Debug</SelectItem>
+                            <SelectItem value="info">Info</SelectItem>
+                            <SelectItem value="notice">Notice</SelectItem>
+                            <SelectItem value="warn">Warning</SelectItem>
+                            <SelectItem value="error">Error</SelectItem>
+                            <SelectItem value="crit">Critical</SelectItem>
+                            <SelectItem value="alert">Alert</SelectItem>
+                            <SelectItem value="emerg">Emergency</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Controls the severity threshold for error logs
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={logsConfigForm.control}
+                    name="logFormat"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Custom Log Format (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="$remote_addr - $remote_user [$time_local] &quot;$request&quot; $status $body_bytes_sent" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Custom format string for access logs (leave blank for default)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-4">
+                    <FormField
+                      control={logsConfigForm.control}
+                      name="rotateLogsDaily"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Rotate Logs Daily
+                            </FormLabel>
+                            <FormDescription>
+                              Automatically rotate logs every day
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={logsConfigForm.control}
+                      name="compressLogs"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Compress Old Logs
+                            </FormLabel>
+                            <FormDescription>
+                              Compress rotated log files to save space
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={logsConfigForm.control}
+                    name="maxLogFiles"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Maximum Log Files to Keep</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Number of rotated log files to keep before deletion
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <FileText className="h-4 w-4 text-blue-500" />
+                    <AlertTitle>Log File Permissions</AlertTitle>
+                    <AlertDescription>
+                      Ensure the paths you specify have appropriate write permissions for the Nginx service.
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" disabled={configTestInProgress}>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Log Settings
                   </Button>
                 </CardFooter>
               </form>
