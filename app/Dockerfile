@@ -23,7 +23,7 @@ RUN if [ -f "package.json" ]; then \
     fi
 
 # Install backend dependencies for NGINX operations
-RUN npm install express bcrypt
+RUN npm install express bcrypt readline
 
 # Build the application (if there's a build script)
 RUN if grep -q "\"build\":" package.json; then \
@@ -43,6 +43,9 @@ RUN apk add --no-cache nginx
 
 # Create directory for NGINX operations
 RUN mkdir -p /etc/nginx
+RUN mkdir -p /var/log/nginx
+RUN touch /var/log/nginx/access.log /var/log/nginx/error.log
+RUN chmod 666 /var/log/nginx/access.log /var/log/nginx/error.log
 
 # Copy built files from build stage
 COPY --from=build /app/dist ./dist
@@ -81,30 +84,6 @@ npm start\n'\
 # Expose port
 EXPOSE 3000
 EXPOSE 3001
-
-# Create server index file
-RUN echo "const express = require('express');\n\
-const app = express();\n\
-const port = process.env.API_PORT || 3001;\n\
-const nginxRoutes = require('./nginx-service');\n\
-\n\
-// Middleware\n\
-app.use(express.json());\n\
-\n\
-// CORS\n\
-app.use((req, res, next) => {\n\
-  res.header('Access-Control-Allow-Origin', '*');\n\
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');\n\
-  next();\n\
-});\n\
-\n\
-// Routes\n\
-app.use(nginxRoutes);\n\
-\n\
-// Start server\n\
-app.listen(port, () => {\n\
-  console.log(`API server listening on port \${port}`);\n\
-});" > /app/server/index.js
 
 # Start application
 CMD ["/app/start.sh"]
