@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { ArrowRight, CheckCircle2, Server, XCircle } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
@@ -27,7 +28,7 @@ export default function HttpProxy() {
           <Card>
             <CardHeader>
               <CardTitle>HTTP Proxy Status</CardTitle>
-              <CardDescription>HTTP forward proxy on port 8080</CardDescription>
+              <CardDescription>HTTP forward proxy on port 80</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2">
@@ -49,7 +50,7 @@ export default function HttpProxy() {
                 <ul className="space-y-2 text-sm">
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Listening Port:</span>
-                    <span className="font-mono">8080</span>
+                    <span className="font-mono">80</span>
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Network Mode:</span>
@@ -75,7 +76,7 @@ export default function HttpProxy() {
                   <Server className="h-4 w-4 text-green-500" />
                   <AlertTitle>Proxy is active</AlertTitle>
                   <AlertDescription>
-                    HTTP proxy is running on host network and accepting connections on port 8080.
+                    HTTP proxy is running on host network and accepting connections on port 80.
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -172,7 +173,7 @@ export default function HttpProxy() {
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Port:</span>
-                    <span className="font-mono">8080</span>
+                    <span className="font-mono">80</span>
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Network Mode:</span>
@@ -187,15 +188,15 @@ export default function HttpProxy() {
                 <div className="rounded-md border p-3">
                   <h4 className="text-xs font-medium mb-1">Command Line (curl)</h4>
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                    curl -x http://your-server-ip:8080 https://example.com
+                    curl -x http://your-server-ip:80 https://example.com
                   </pre>
                 </div>
                 
                 <div className="rounded-md border p-3">
                   <h4 className="text-xs font-medium mb-1">Environment Variables</h4>
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                    export HTTP_PROXY=http://your-server-ip:8080
-                    export HTTPS_PROXY=http://your-server-ip:8080
+                    export HTTP_PROXY=http://your-server-ip:80
+                    export HTTPS_PROXY=http://your-server-ip:80
                   </pre>
                 </div>
                 

@@ -1,4 +1,3 @@
-
 import { WhitelistGroup } from "@/types/proxy";
 import axios from "axios";
 
@@ -140,7 +139,7 @@ http {
 # PLACEHOLDER:MAP_BLOCKS
     
     server {
-        listen 8080 ssl http2;
+        listen 80 ssl http2;
         
         # SSL configuration for HTTPS
         ssl_certificate /etc/nginx/certs/server.crt;
