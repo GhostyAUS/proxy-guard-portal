@@ -62,11 +62,11 @@ function countTopItems(logs: LogEntry[], property: 'clientIp' | 'destination', l
     return Object.entries(counts)
       .map(([clientIp, count]) => ({ clientIp, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, limit);
+      .slice(0, limit) as Array<{ clientIp: string, count: number }>;
   } else {
     return Object.entries(counts)
       .map(([destination, count]) => ({ destination, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, limit);
+      .slice(0, limit) as Array<{ destination: string, count: number }>;
   }
 }
