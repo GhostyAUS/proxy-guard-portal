@@ -44,29 +44,37 @@ export const mockLogStats: LogStats = {
   totalRequests: mockLogs.length,
   allowedRequests: mockLogs.filter(log => log.status === 'allowed').length,
   deniedRequests: mockLogs.filter(log => log.status === 'denied').length,
-  topClients: countTopItems(mockLogs, 'clientIp', 5),
-  topDestinations: countTopItems(mockLogs, 'destination', 5),
+  topClients: countTopItemsClients(mockLogs, 5),
+  topDestinations: countTopItemsDestinations(mockLogs, 5),
   lastUpdated: new Date().toISOString()
 };
 
-// Helper function to count occurrences and get top items
-function countTopItems(logs: LogEntry[], property: 'clientIp' | 'destination', limit: number) {
+// Helper function to count client IPs and get top items
+function countTopItemsClients(logs: LogEntry[], limit: number): Array<{ clientIp: string, count: number }> {
   const counts: Record<string, number> = {};
   
   logs.forEach(log => {
-    const value = log[property];
+    const value = log.clientIp;
     counts[value] = (counts[value] || 0) + 1;
   });
   
-  if (property === 'clientIp') {
-    return Object.entries(counts)
-      .map(([clientIp, count]) => ({ clientIp, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, limit) as Array<{ clientIp: string, count: number }>;
-  } else {
-    return Object.entries(counts)
-      .map(([destination, count]) => ({ destination, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, limit) as Array<{ destination: string, count: number }>;
-  }
+  return Object.entries(counts)
+    .map(([clientIp, count]) => ({ clientIp, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+// Helper function to count destinations and get top items
+function countTopItemsDestinations(logs: LogEntry[], limit: number): Array<{ destination: string, count: number }> {
+  const counts: Record<string, number> = {};
+  
+  logs.forEach(log => {
+    const value = log.destination;
+    counts[value] = (counts[value] || 0) + 1;
+  });
+  
+  return Object.entries(counts)
+    .map(([destination, count]) => ({ destination, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
 }
