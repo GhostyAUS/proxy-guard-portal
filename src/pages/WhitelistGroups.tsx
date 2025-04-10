@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowUpDown, Edit, Plus, Trash, RefreshCw, AlertCircle, Bug } from "lucide-react";
+import { ArrowUpDown, Edit, Plus, Trash, RefreshCw, AlertCircle, Bug, Code, Server } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import axios from "axios";
 
 export default function WhitelistGroups() {
   const location = useLocation();
@@ -38,6 +39,9 @@ export default function WhitelistGroups() {
   const [deleteGroupItem, setDeleteGroupItem] = useState<WhitelistGroup | null>(null);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
   const [isDebugMode, setIsDebugMode] = useState(false);
+  const [apiTestResults, setApiTestResults] = useState<Record<string, any>>({});
+  const [apiRoutes, setApiRoutes] = useState<string[]>([]);
+  const [lastRefreshed, setLastRefreshed] = useState<string>(new Date().toISOString());
 
   useEffect(() => {
     document.title = "Whitelist Groups | Proxy Guard";
@@ -106,16 +110,88 @@ export default function WhitelistGroups() {
   const handleRefresh = () => {
     toast.info("Refreshing whitelist groups...");
     fetchGroups();
+    setLastRefreshed(new Date().toISOString());
   };
 
   const toggleDebugMode = () => {
     setIsDebugMode(!isDebugMode);
+    
+    // If enabling debug mode, fetch API routes
+    if (!isDebugMode) {
+      fetchApiRoutes();
+    }
+  };
+  
+  const fetchApiRoutes = async () => {
+    try {
+      const timestamp = new Date().getTime();
+      const response = await axios.get(`/api/debug/routes?t=${timestamp}`);
+      console.log("API routes:", response.data);
+      setApiRoutes(response.data.routes || []);
+    } catch (err) {
+      console.error("Error fetching API routes:", err);
+      setApiRoutes([]);
+    }
+  };
+  
+  const testApiEndpoint = async (endpoint: string) => {
+    try {
+      const timestamp = new Date().getTime();
+      const response = await axios.get(`${endpoint}?t=${timestamp}`);
+      console.log(`API test for ${endpoint}:`, response.data);
+      setApiTestResults(prev => ({
+        ...prev,
+        [endpoint]: {
+          status: response.status,
+          data: response.data,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      toast.success(`API test successful: ${endpoint}`);
+      return response.data;
+    } catch (err) {
+      console.error(`API test failed for ${endpoint}:`, err);
+      setApiTestResults(prev => ({
+        ...prev,
+        [endpoint]: {
+          status: err.response?.status || 'Error',
+          error: err.message,
+          timestamp: new Date().toISOString()
+        }
+      }));
+      toast.error(`API test failed: ${endpoint}`);
+      return null;
+    }
   };
 
   const filteredGroups = groups.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  const handleCreateDemoGroup = async () => {
+    try {
+      const demoGroup = {
+        name: `Demo Group ${new Date().toLocaleTimeString()}`,
+        description: "Automatically created demo group",
+        clients: [
+          { id: crypto.randomUUID(), value: "10.0.0.1", description: "Demo Client 1" },
+          { id: crypto.randomUUID(), value: "192.168.1.0/24", description: "Demo Network" }
+        ],
+        destinations: [
+          { id: crypto.randomUUID(), value: "example.com", description: "Example Website" },
+          { id: crypto.randomUUID(), value: "api.example.org", description: "Example API" }
+        ],
+        enabled: true
+      };
+      
+      await addGroup(demoGroup);
+      toast.success("Demo group created");
+    } catch (error) {
+      console.error("Error creating demo group:", error);
+      toast.error("Failed to create demo group");
+    }
+  };
 
   return (
     <Layout>
@@ -140,10 +216,16 @@ export default function WhitelistGroups() {
         {isDebugMode && (
           <Card className="border-yellow-400 bg-yellow-50 dark:bg-yellow-950">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Debug Information</CardTitle>
+              <CardTitle className="text-lg flex items-center">
+                <Server className="h-5 w-5 mr-2" />
+                Debug Information
+              </CardTitle>
+              <CardDescription>
+                Technical information for troubleshooting API and data issues
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Accordion type="single" collapsible>
+              <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="api-status">
                   <AccordionTrigger>API Status</AccordionTrigger>
                   <AccordionContent>
@@ -152,10 +234,14 @@ export default function WhitelistGroups() {
                       <div><strong>Loading State:</strong> {isLoading ? "True" : "False"}</div>
                       <div><strong>Error:</strong> {error || "None"}</div>
                       <div><strong>Groups Count:</strong> {groups.length}</div>
+                      <div><strong>Last Refreshed:</strong> {new Date(lastRefreshed).toLocaleString()}</div>
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-2 space-x-2">
                       <Button size="sm" onClick={handleRefresh} variant="outline">
                         Retry API Call
+                      </Button>
+                      <Button size="sm" onClick={handleCreateDemoGroup} variant="outline">
+                        Create Demo Group
                       </Button>
                     </div>
                   </AccordionContent>
@@ -168,49 +254,137 @@ export default function WhitelistGroups() {
                     </pre>
                   </AccordionContent>
                 </AccordionItem>
+                <AccordionItem value="api-routes">
+                  <AccordionTrigger>API Routes</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="mb-2">
+                      <Button 
+                        size="sm" 
+                        onClick={fetchApiRoutes}
+                        variant="outline"
+                      >
+                        Refresh API Routes
+                      </Button>
+                    </div>
+                    {apiRoutes.length > 0 ? (
+                      <div className="bg-slate-100 dark:bg-slate-900 p-2 rounded text-xs">
+                        <h4 className="font-medium mb-2">Available API Routes:</h4>
+                        <ul className="space-y-1">
+                          {apiRoutes.map((route, index) => (
+                            <li key={index} className="flex items-center justify-between">
+                              <code>{route}</code>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => testApiEndpoint(`/api${route}`)}
+                                className="h-6 px-2"
+                              >
+                                Test
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-sm">No API routes found or loaded yet.</p>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
                 <AccordionItem value="api-request">
                   <AccordionTrigger>API Request Test</AccordionTrigger>
                   <AccordionContent>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button 
+                          size="sm" 
+                          onClick={() => testApiEndpoint('/api/whitelist-groups')}
+                          className="mr-2"
+                        >
+                          Test Groups API
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          onClick={() => testApiEndpoint('/api/debug/routes')}
+                          className="mr-2"
+                        >
+                          Test Routes API
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          onClick={() => testApiEndpoint('/api/health')}
+                        >
+                          Test Health API
+                        </Button>
+                      </div>
+                      
+                      {Object.keys(apiTestResults).length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium mb-2">Test Results:</h4>
+                          <div className="space-y-4">
+                            {Object.entries(apiTestResults).map(([endpoint, result], index) => (
+                              <div 
+                                key={index} 
+                                className={`p-2 rounded-md text-xs ${
+                                  result.status >= 200 && result.status < 300 
+                                    ? 'bg-green-50 border-green-200 dark:bg-green-950 border dark:border-green-800' 
+                                    : 'bg-red-50 border-red-200 dark:bg-red-950 border dark:border-red-800'
+                                }`}
+                              >
+                                <div className="font-medium mb-1 flex justify-between">
+                                  <span>{endpoint}</span>
+                                  <span className={result.status >= 200 && result.status < 300 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                    Status: {result.status}
+                                  </span>
+                                </div>
+                                <div className="mb-1 text-xs text-muted-foreground">
+                                  Time: {new Date(result.timestamp).toLocaleString()}
+                                </div>
+                                {result.error ? (
+                                  <div className="text-red-600 dark:text-red-400">{result.error}</div>
+                                ) : (
+                                  <pre className="whitespace-pre-wrap overflow-auto max-h-40 bg-slate-100 dark:bg-slate-900 p-1 rounded">
+                                    {JSON.stringify(result.data, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="request-headers">
+                  <AccordionTrigger>Request Headers</AccordionTrigger>
+                  <AccordionContent>
                     <Button 
                       size="sm" 
-                      onClick={() => {
-                        const apiUrl = `${import.meta.env.VITE_API_BASE_URL || "/api"}/debug/routes`;
-                        toast.info(`Testing API: ${apiUrl}`);
-                        fetch(apiUrl)
-                          .then(res => res.json())
-                          .then(data => {
-                            console.log("API routes:", data);
-                            toast.success(`API responded with ${data.totalRoutes} routes`);
-                          })
-                          .catch(err => {
-                            console.error("API test failed:", err);
-                            toast.error("API test failed");
-                          });
+                      onClick={async () => {
+                        const timestamp = new Date().getTime();
+                        const response = await axios.get(`/api/whitelist-groups?t=${timestamp}`, {
+                          headers: {
+                            'X-Debug': 'true',
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                          }
+                        });
+                        console.log("Request with debug headers:", response.data);
+                        toast.success("Request sent with debug headers");
                       }}
-                      className="mr-2"
+                      className="mb-2"
                     >
-                      Test API Routes
+                      Send Request with Debug Headers
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="secondary"
-                      onClick={() => {
-                        const apiUrl = `${import.meta.env.VITE_API_BASE_URL || "/api"}/health`;
-                        toast.info(`Testing API health: ${apiUrl}`);
-                        fetch(apiUrl)
-                          .then(res => res.json())
-                          .then(data => {
-                            console.log("API health:", data);
-                            toast.success("API health check passed");
-                          })
-                          .catch(err => {
-                            console.error("API health check failed:", err);
-                            toast.error("API health check failed");
-                          });
-                      }}
-                    >
-                      Test API Health
-                    </Button>
+                    <pre className="bg-slate-100 dark:bg-slate-900 p-2 rounded text-xs">
+{`// Headers used for API requests
+{
+  'Accept': 'application/json',
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+}`}
+                    </pre>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -295,8 +469,8 @@ export default function WhitelistGroups() {
                             </Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">{group.clients.length}</TableCell>
-                        <TableCell className="hidden md:table-cell">{group.destinations.length}</TableCell>
+                        <TableCell className="hidden md:table-cell">{group.clients ? group.clients.length : 0}</TableCell>
+                        <TableCell className="hidden md:table-cell">{group.destinations ? group.destinations.length : 0}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button variant="outline" size="icon" asChild>
@@ -318,7 +492,12 @@ export default function WhitelistGroups() {
                     )) : (
                       <TableRow>
                         <TableCell colSpan={5} className="h-24 text-center">
-                          No whitelist groups found.
+                          <div className="flex flex-col items-center justify-center">
+                            <p className="mb-2">No whitelist groups found.</p>
+                            <Button size="sm" onClick={handleCreateDemoGroup}>
+                              <Plus className="h-4 w-4 mr-2" /> Create Demo Group
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )}
