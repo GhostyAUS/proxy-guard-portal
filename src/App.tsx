@@ -19,7 +19,15 @@ import { WhitelistGroupsProvider } from "./hooks/useWhitelistGroups";
 // Set up API base URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: true,
+      staleTime: 30000,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -39,7 +47,6 @@ const App = () => (
               <Route path="/https-proxy" element={<HttpsProxy />} />
               <Route path="/logs" element={<LogsPage />} />
               <Route path="/whitelist/create" element={<WhitelistDetail />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

@@ -36,10 +36,13 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Skeleton } from "@/components/ui/skeleton";
 
-import { mockProxySettings, mockNginxStatus } from "@/utils/mockData";
 import { testConfigWritable } from "@/utils/nginxUtils";
 import { ProxySettings } from "@/types/proxy";
+import { useProxySettings } from "@/hooks/useProxySettings";
+import { useNginxStatus } from "@/hooks/useNginxStatus";
+import { fetchProxySettings } from "@/services/apiService";
 
 const nginxConfigSchema = z.object({
   nginxConfigPath: z.string().min(1, "Config path is required"),
@@ -83,88 +86,117 @@ const clientAuthSchema = z.object({
 });
 
 export default function Settings() {
-  const [settings, setSettings] = useState<ProxySettings>(mockProxySettings);
-  const [nginxStatus, setNginxStatus] = useState(mockNginxStatus);
+  const { data: proxySettings, isLoading: isLoadingSettings, refetch: refetchSettings } = useProxySettings();
+  const { data: nginxStatus, isLoading: isLoadingStatus, refetch: refetchStatus } = useNginxStatus();
+  const [settings, setSettings] = useState<ProxySettings | null>(null);
   const [configTestInProgress, setConfigTestInProgress] = useState(false);
 
   useEffect(() => {
     document.title = "Settings | Proxy Guard";
   }, []);
 
+  useEffect(() => {
+    if (proxySettings && !settings) {
+      setSettings(proxySettings);
+    }
+  }, [proxySettings, settings]);
+
   const nginxConfigForm = useForm<z.infer<typeof nginxConfigSchema>>({
     resolver: zodResolver(nginxConfigSchema),
     defaultValues: {
-      nginxConfigPath: settings.nginxConfigPath,
+      nginxConfigPath: settings?.nginxConfigPath || "",
     },
+    values: {
+      nginxConfigPath: settings?.nginxConfigPath || "",
+    }
   });
 
   const logsConfigForm = useForm<z.infer<typeof logsConfigSchema>>({
     resolver: zodResolver(logsConfigSchema),
     defaultValues: {
-      accessLogPath: settings.logsSettings?.accessLogPath || "/var/log/nginx/access.log",
-      errorLogPath: settings.logsSettings?.errorLogPath || "/var/log/nginx/error.log",
-      logLevel: settings.logsSettings?.logLevel || "error",
-      logFormat: settings.logsSettings?.logFormat || "",
-      rotateLogsDaily: settings.logsSettings?.rotateLogsDaily !== false,
-      compressLogs: settings.logsSettings?.compressLogs !== false,
-      maxLogFiles: settings.logsSettings?.maxLogFiles || "10",
+      accessLogPath: settings?.logsSettings?.accessLogPath || "/var/log/nginx/access.log",
+      errorLogPath: settings?.logsSettings?.errorLogPath || "/var/log/nginx/error.log",
+      logLevel: settings?.logsSettings?.logLevel || "error",
+      logFormat: settings?.logsSettings?.logFormat || "",
+      rotateLogsDaily: settings?.logsSettings?.rotateLogsDaily !== false,
+      compressLogs: settings?.logsSettings?.compressLogs !== false,
+      maxLogFiles: settings?.logsSettings?.maxLogFiles || "10",
     },
+    values: {
+      accessLogPath: settings?.logsSettings?.accessLogPath || "/var/log/nginx/access.log",
+      errorLogPath: settings?.logsSettings?.errorLogPath || "/var/log/nginx/error.log",
+      logLevel: settings?.logsSettings?.logLevel || "error",
+      logFormat: settings?.logsSettings?.logFormat || "",
+      rotateLogsDaily: settings?.logsSettings?.rotateLogsDaily !== false,
+      compressLogs: settings?.logsSettings?.compressLogs !== false,
+      maxLogFiles: settings?.logsSettings?.maxLogFiles || "10",
+    }
   });
 
   const ldapForm = useForm<z.infer<typeof ldapSettingsSchema>>({
     resolver: zodResolver(ldapSettingsSchema),
     defaultValues: {
-      serverUrl: settings.ldapSettings?.serverUrl || "",
-      bindDn: settings.ldapSettings?.bindDn || "",
-      searchBase: settings.ldapSettings?.searchBase || "",
-      searchFilter: settings.ldapSettings?.searchFilter || "",
-      useLdaps: settings.ldapSettings?.useLdaps || false,
-      ldapPort: settings.ldapSettings?.ldapPort || "389",
-    },
+      serverUrl: settings?.ldapSettings?.serverUrl || "",
+      bindDn: settings?.ldapSettings?.bindDn || "",
+      searchBase: settings?.ldapSettings?.searchBase || "",
+      searchFilter: settings?.ldapSettings?.searchFilter || "",
+      useLdaps: settings?.ldapSettings?.useLdaps || false,
+      ldapPort: settings?.ldapSettings?.ldapPort || "389",
+    }
   });
 
   const samlForm = useForm<z.infer<typeof samlSettingsSchema>>({
     resolver: zodResolver(samlSettingsSchema),
     defaultValues: {
-      entityId: settings.samlSettings?.entityId || "",
-      assertionConsumerService: settings.samlSettings?.assertionConsumerService || "",
-      idpMetadataUrl: settings.samlSettings?.idpMetadataUrl || "",
-    },
+      entityId: settings?.samlSettings?.entityId || "",
+      assertionConsumerService: settings?.samlSettings?.assertionConsumerService || "",
+      idpMetadataUrl: settings?.samlSettings?.idpMetadataUrl || "",
+    }
   });
 
   const clientAuthForm = useForm<z.infer<typeof clientAuthSchema>>({
     resolver: zodResolver(clientAuthSchema),
     defaultValues: {
-      requireAuth: settings.clientAuth?.requireAuth || false,
-      authMethod: settings.clientAuth?.authMethod || "none",
-      realm: settings.clientAuth?.realm || "Proxy Guard",
-      ldapUrl: settings.clientAuth?.ldapUrl || "",
-      ldapBindDn: settings.clientAuth?.ldapBindDn || "",
-      ldapSearchBase: settings.clientAuth?.ldapSearchBase || "",
-      ldapSearchFilter: settings.clientAuth?.ldapSearchFilter || "",
-      ldapPort: settings.clientAuth?.ldapPort || "389",
-      useLdaps: settings.clientAuth?.useLdaps || false,
-    },
+      requireAuth: settings?.clientAuth?.requireAuth || false,
+      authMethod: settings?.clientAuth?.authMethod || "none",
+      realm: settings?.clientAuth?.realm || "Proxy Guard",
+      ldapUrl: settings?.clientAuth?.ldapUrl || "",
+      ldapBindDn: settings?.clientAuth?.ldapBindDn || "",
+      ldapSearchBase: settings?.clientAuth?.ldapSearchBase || "",
+      ldapSearchFilter: settings?.clientAuth?.ldapSearchFilter || "",
+      ldapPort: settings?.clientAuth?.ldapPort || "389",
+      useLdaps: settings?.clientAuth?.useLdaps || false,
+    }
   });
 
   const onSaveNginxConfig = async (data: z.infer<typeof nginxConfigSchema>) => {
     try {
       setConfigTestInProgress(true);
       
-      // Simulate API call to check if the config file is writable
       const isWritable = await testConfigWritable(data.nginxConfigPath);
       
       if (isWritable) {
-        setSettings({
-          ...settings,
-          nginxConfigPath: data.nginxConfigPath,
+        const response = await fetch("/api/settings/nginx-config", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ nginxConfigPath: data.nginxConfigPath })
         });
         
-        setNginxStatus({
-          ...nginxStatus,
-          configWritable: true,
-          lastModified: new Date().toISOString(),
-        });
+        if (!response.ok) {
+          throw new Error("Failed to save nginx configuration path");
+        }
+        
+        if (settings) {
+          setSettings({
+            ...settings,
+            nginxConfigPath: data.nginxConfigPath,
+          });
+        }
+        
+        refetchSettings();
+        refetchStatus();
         
         toast.success("Nginx configuration path updated");
       } else {
@@ -185,7 +217,6 @@ export default function Settings() {
     try {
       setConfigTestInProgress(true);
       
-      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setSettings({
@@ -270,19 +301,25 @@ export default function Settings() {
     try {
       setConfigTestInProgress(true);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setNginxStatus({
-        ...nginxStatus,
-        lastConfigTest: {
-          success: true,
-          message: "Configuration test successful",
-        },
-        lastModified: new Date().toISOString(),
+      const response = await fetch("/api/nginx/test-config", {
+        method: "POST",
       });
       
-      toast.success("Nginx configuration test passed");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Configuration test failed");
+      }
+      
+      const testResult = await response.json();
+      refetchStatus();
+      
+      if (testResult.success) {
+        toast.success("Nginx configuration test passed");
+      } else {
+        toast.error("Configuration test failed", {
+          description: testResult.message,
+        });
+      }
     } catch (error) {
       toast.error("Configuration test failed", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -292,8 +329,50 @@ export default function Settings() {
     }
   };
 
-  const clientAuthMethod = clientAuthForm.watch("authMethod");
-  const requireClientAuth = clientAuthForm.watch("requireAuth");
+  const clientAuthMethod = clientAuthForm?.watch("authMethod");
+  const requireClientAuth = clientAuthForm?.watch("requireAuth");
+
+  if (isLoadingSettings || isLoadingStatus || !settings) {
+    return (
+      <Layout>
+        <div className="flex flex-col gap-4">
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <div className="grid gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Nginx Configuration</CardTitle>
+                <CardDescription>Loading configuration...</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Skeleton className="h-10 w-36" />
+              </CardFooter>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Logs Configuration</CardTitle>
+                <CardDescription>Loading configuration...</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -328,7 +407,7 @@ export default function Settings() {
                     )}
                   />
 
-                  {nginxStatus.configWritable ? (
+                  {nginxStatus?.configWritable ? (
                     <Alert className="bg-green-50 border-green-200">
                       <Check className="h-4 w-4 text-green-500" />
                       <AlertTitle>Configuration file is writable</AlertTitle>
