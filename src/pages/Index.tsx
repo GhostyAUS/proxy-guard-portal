@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -15,10 +16,11 @@ import { mockWhitelistGroups, mockNginxStatus } from "@/utils/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { v4 as uuidv4 } from "uuid";
+import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 
 export default function Dashboard() {
-  const [whitelistGroups] = useState(mockWhitelistGroups);
   const [nginxStatus] = useState(mockNginxStatus);
+  const { groups: whitelistGroups } = useWhitelistGroups();
   
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";

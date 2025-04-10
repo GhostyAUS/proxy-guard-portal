@@ -16,9 +16,9 @@ interface WhitelistGroupsContextType {
   deleteGroup: (id: string) => Promise<void>;
   getGroupById: (id: string) => WhitelistGroup | undefined;
   addClient: (groupId: string, client: { value: string; description?: string }) => Promise<void>;
-  addDestinationToGroup: (groupId: string, destination: { value: string; description?: string }) => Promise<void>;
-  removeClientFromGroup: (groupId: string, clientId: string) => Promise<void>;
-  removeDestinationFromGroup: (groupId: string, destinationId: string) => Promise<void>;
+  addDestination: (groupId: string, destination: { value: string; description?: string }) => Promise<void>;
+  removeClient: (groupId: string, clientId: string) => Promise<void>;
+  removeDestination: (groupId: string, destinationId: string) => Promise<void>;
   fetchGroups: () => Promise<void>;
   toggleGroupEnabled: (id: string) => Promise<void>;
 }
@@ -99,10 +99,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchGroups();
-  }, []);
 
   const toggleGroupEnabled = useCallback(async (id: string): Promise<void> => {
     try {
@@ -324,7 +320,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
 
   const getGroupById = useCallback((id: string) => groups.find(group => group.id === id), [groups]);
 
-  const addClient = useCallback(async (groupId: string, client: { value: string; description?: string }) => {
+  const addClient = useCallback(async (groupId: string, client: { value: string; description?: string }): Promise<void> => {
     try {
       setIsLoading(true);
       const group = getGroupById(groupId);
@@ -345,9 +341,9 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     } finally {
       setIsLoading(false);
     }
-  }, [getGroupById, updateGroup]);
+  }, []);
 
-  const addDestinationToGroup = useCallback(async (groupId: string, destination: { value: string; description?: string }) => {
+  const addDestination = useCallback(async (groupId: string, destination: { value: string; description?: string }): Promise<void> => {
     try {
       setIsLoading(true);
       const group = getGroupById(groupId);
@@ -368,9 +364,9 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     } finally {
       setIsLoading(false);
     }
-  }, [getGroupById, updateGroup]);
+  }, []);
 
-  const removeClientFromGroup = useCallback(async (groupId: string, clientId: string) => {
+  const removeClient = useCallback(async (groupId: string, clientId: string): Promise<void> => {
     try {
       setIsLoading(true);
       const group = getGroupById(groupId);
@@ -390,9 +386,9 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     } finally {
       setIsLoading(false);
     }
-  }, [getGroupById, updateGroup]);
+  }, []);
 
-  const removeDestinationFromGroup = useCallback(async (groupId: string, destinationId: string) => {
+  const removeDestination = useCallback(async (groupId: string, destinationId: string): Promise<void> => {
     try {
       setIsLoading(true);
       const group = getGroupById(groupId);
@@ -412,7 +408,11 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     } finally {
       setIsLoading(false);
     }
-  }, [getGroupById, updateGroup]);
+  }, []);
+
+  useEffect(() => {
+    fetchGroups();
+  }, []);
 
   const value = {
     groups,
@@ -423,9 +423,9 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     deleteGroup,
     getGroupById,
     addClient,
-    addDestinationToGroup,
-    removeClientFromGroup,
-    removeDestinationFromGroup,
+    addDestination,
+    removeClient,
+    removeDestination,
     fetchGroups,
     toggleGroupEnabled
   };

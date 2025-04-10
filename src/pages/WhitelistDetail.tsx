@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -105,11 +104,11 @@ export default function WhitelistDetail() {
   const { 
     addGroup, 
     updateGroup, 
-    getGroupById, 
-    addClientToGroup, 
-    addDestinationToGroup,
-    removeClientFromGroup,
-    removeDestinationFromGroup,
+    getGroupById,
+    addClient,
+    addDestination,
+    removeClient,
+    removeDestination,
     groups
   } = useWhitelistGroups();
   
@@ -198,11 +197,11 @@ export default function WhitelistDetail() {
     }
   };
   
-  const addClient = async (values: z.infer<typeof clientSchema>) => {
+  const addClientHandler = async (values: z.infer<typeof clientSchema>) => {
     if (group) {
       try {
         setIsLoading(true);
-        await addClientToGroup(group.id, {
+        await addClient(group.id, {
           value: values.value,
           description: values.description || undefined
         });
@@ -226,11 +225,11 @@ export default function WhitelistDetail() {
     }
   };
   
-  const addDestination = async (values: z.infer<typeof destinationSchema>) => {
+  const addDestinationHandler = async (values: z.infer<typeof destinationSchema>) => {
     if (group) {
       try {
         setIsLoading(true);
-        await addDestinationToGroup(group.id, {
+        await addDestination(group.id, {
           value: values.value,
           description: values.description || undefined
         });
@@ -258,7 +257,7 @@ export default function WhitelistDetail() {
     if (group) {
       try {
         setIsLoading(true);
-        await removeClientFromGroup(group.id, clientId);
+        await removeClient(group.id, clientId);
         
         // Update local state
         const updatedGroup = getGroupById(group.id);
@@ -282,7 +281,7 @@ export default function WhitelistDetail() {
     if (group) {
       try {
         setIsLoading(true);
-        await removeDestinationFromGroup(group.id, destId);
+        await removeDestination(group.id, destId);
         
         // Update local state
         const updatedGroup = getGroupById(group.id);
@@ -736,7 +735,6 @@ export default function WhitelistDetail() {
         </Tabs>
       </div>
 
-      {/* Add Client Dialog */}
       <Dialog open={isAddingClient} onOpenChange={setIsAddingClient}>
         <DialogContent>
           <DialogHeader>
@@ -746,7 +744,7 @@ export default function WhitelistDetail() {
             </DialogDescription>
           </DialogHeader>
           <Form {...clientForm}>
-            <form onSubmit={clientForm.handleSubmit(addClient)} className="space-y-4">
+            <form onSubmit={clientForm.handleSubmit(addClientHandler)} className="space-y-4">
               <FormField
                 control={clientForm.control}
                 name="value"
@@ -812,7 +810,6 @@ export default function WhitelistDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Destination Dialog */}
       <Dialog open={isAddingDestination} onOpenChange={setIsAddingDestination}>
         <DialogContent>
           <DialogHeader>
@@ -822,7 +819,7 @@ export default function WhitelistDetail() {
             </DialogDescription>
           </DialogHeader>
           <Form {...destinationForm}>
-            <form onSubmit={destinationForm.handleSubmit(addDestination)} className="space-y-4">
+            <form onSubmit={destinationForm.handleSubmit(addDestinationHandler)} className="space-y-4">
               <FormField
                 control={destinationForm.control}
                 name="value"
@@ -888,7 +885,6 @@ export default function WhitelistDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Client Confirmation */}
       <AlertDialog 
         open={!!clientToDelete} 
         onOpenChange={() => setClientToDelete(null)}
@@ -914,7 +910,6 @@ export default function WhitelistDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Destination Confirmation */}
       <AlertDialog 
         open={!!destinationToDelete} 
         onOpenChange={() => setDestinationToDelete(null)}
