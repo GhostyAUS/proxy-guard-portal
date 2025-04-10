@@ -48,8 +48,9 @@ http {
     }
     
     server {
-        # Updated directive format
         listen 8080;
+        
+        # Use the proper http2 directive
         http2 on;
         
         # Make SSL optional - only enable if certificates exist

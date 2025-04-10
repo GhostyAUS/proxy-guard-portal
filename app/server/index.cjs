@@ -85,8 +85,51 @@ app.get('/api/debug/paths', (req, res) => {
   res.json(result);
 });
 
+// Debug endpoint to get available routes
+app.get('/api/debug/routes', (req, res) => {
+  try {
+    // Get all registered routes
+    const routes = [];
+    
+    // Walk through all layers recursively
+    function extractRoutes(stack, basePath = '') {
+      for (const layer of stack) {
+        if (layer.route) {
+          // Routes registered directly on the router
+          const methods = Object.keys(layer.route.methods)
+            .filter(method => layer.route.methods[method])
+            .map(method => method.toUpperCase());
+            
+          routes.push(`${methods.join(',')} ${basePath}${layer.route.path}`);
+        } else if (layer.name === 'router' && layer.handle.stack) {
+          // Nested routers
+          const path = layer.regexp.source.replace('^\\/','').replace('(?=\\/|$)', '').replace(/\\\//g, '/');
+          extractRoutes(layer.handle.stack, `${basePath}/${path}`);
+        }
+      }
+    }
+    
+    // Get routes from the parent app
+    if (app._router && app._router.stack) {
+      extractRoutes(app._router.stack);
+    }
+    
+    res.json({ 
+      routes,
+      baseUrl: process.env.API_BASE_URL || '/api',
+      configPath: process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf'
+    });
+  } catch (error) {
+    console.error('Error getting api routes:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Catch-all route handler for non-existent API endpoints
-app.use('/api/*', (req, res) => {
+app.all('/api/*', (req, res, next) => {
+  if (res.headersSent) {
+    return next();
+  }
   res.status(404).json({
     error: `Endpoint not found: ${req.originalUrl}`,
     available: 'Use /api/debug/routes to see available endpoints'
@@ -96,10 +139,12 @@ app.use('/api/*', (req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('API Error:', err);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: err.message
-  });
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: err.message
+    });
+  }
 });
 
 // Start the server

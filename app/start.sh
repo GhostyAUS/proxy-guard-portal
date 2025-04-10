@@ -11,19 +11,33 @@ if [ ! -f "/etc/nginx/nginx.conf" ] && [ -f "/etc/nginx/nginx.conf.template" ]; 
   cp /etc/nginx/nginx.conf.template /etc/nginx/nginx.conf
 fi
 
-# Start the backend API server
+# Create directory for the server if it doesn't exist
+mkdir -p /app/server
+
+# Ensure server files exist in the correct location
+if [ ! -f "/app/server/index.cjs" ] && [ -f "/app/src/server/index.cjs" ]; then
+  echo "Copying server files from src/server to server directory..."
+  cp /app/src/server/index.cjs /app/server/
+  cp /app/src/server/nginx-service.cjs /app/server/
+fi
+
+echo "Starting the backend API server..."
 NODE_ENV=production node /app/server/index.cjs &
 API_PID=$!
 echo "API server started with PID: $API_PID"
 
 # Wait a moment for API to initialize
-sleep 2
+sleep 3
 
 # Verify API server is running
-if [ -d "/proc/$API_PID" ]; then
+if kill -0 $API_PID 2>/dev/null; then
   echo "API server running successfully"
 else
   echo "ERROR: API server failed to start properly"
+  # Show last error logs
+  echo "Last error logs:"
+  tail -n 20 /var/log/nginx/error.log 2>/dev/null
+  
   # Try to start a minimal API server as fallback
   echo "Starting minimal API server as fallback..."
   node -e "
@@ -39,7 +53,7 @@ else
     });
     app.get('/api/health', (req, res) => {
       res.setHeader('Content-Type', 'application/json');
-      res.json({ status: 'ok' });
+      res.json({ status: 'ok', mode: 'minimal' });
     });
     app.listen(PORT, () => console.log('Minimal API running on port ' + PORT));
   " &
