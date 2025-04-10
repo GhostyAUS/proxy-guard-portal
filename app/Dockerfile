@@ -58,22 +58,20 @@ COPY --from=build /app/src/server ./server 2>/dev/null || echo "Server directory
 # Create a minimal server file if it doesn't exist
 RUN mkdir -p /app/server
 RUN if [ ! -f "/app/server/index.js" ]; then \
-      cat > /app/server/index.js << 'EOF'
-console.log("Creating minimal API server");
-const express = require("express");
-const app = express();
-const PORT = process.env.API_PORT || 3001;
-
-app.use(express.json());
-
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date() });
-});
-
-app.listen(PORT, () => {
-  console.log(`API Server running on port ${PORT}`);
-});
-EOF
+    printf 'console.log("Creating minimal API server");\n\
+const express = require("express");\n\
+const app = express();\n\
+const PORT = process.env.API_PORT || 3001;\n\
+\n\
+app.use(express.json());\n\
+\n\
+app.get("/api/health", (req, res) => {\n\
+  res.json({ status: "ok", timestamp: new Date() });\n\
+});\n\
+\n\
+app.listen(PORT, () => {\n\
+  console.log(`API Server running on port ${PORT}`);\n\
+});\n' > /app/server/index.js; \
     fi
 
 # Create a minimal start script if it doesn't exist
@@ -96,26 +94,23 @@ RUN echo "Checking package.json for start script:" && \
 RUN echo "Final package.json content:" && cat package.json
 
 # Create the start.sh script with better error handling
-RUN cat > /app/start.sh << 'EOF'
-#!/bin/sh
-
-# Start the backend API server if it exists
-if [ -f "/app/server/index.js" ]; then
-  echo "Starting API server..."
-  node /app/server/index.js &
-else
-  echo "WARNING: API server file not found, skipping backend startup"
-fi
-
-# Start the frontend
-echo "Starting frontend..."
-npm start
-EOF
+RUN printf '#!/bin/sh\n\
+\n\
+# Start the backend API server if it exists\n\
+if [ -f "/app/server/index.js" ]; then\n\
+  echo "Starting API server..."\n\
+  node /app/server/index.js &\n\
+else\n\
+  echo "WARNING: API server file not found, skipping backend startup"\n\
+fi\n\
+\n\
+# Start the frontend\n\
+echo "Starting frontend..."\n\
+npm start\n' > /app/start.sh
 
 # Ensure the script exists and is executable
 RUN chmod +x /app/start.sh
 RUN ls -la /app/start.sh
-RUN cat /app/start.sh
 
 # Expose port
 EXPOSE 3000
