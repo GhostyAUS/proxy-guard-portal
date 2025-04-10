@@ -13,9 +13,11 @@ export function useNginxStatus() {
     meta: {
       errorBoundary: false
     },
-    // Using onError within meta as per @tanstack/react-query v5+
-    onError: (error) => {
-      console.error('Error in useNginxStatus hook:', error);
+    // Using proper error handling for @tanstack/react-query v5+
+    onSettled: (_, error) => {
+      if (error) {
+        console.error('Error in useNginxStatus hook:', error);
+      }
     }
   });
 }

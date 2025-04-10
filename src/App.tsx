@@ -20,6 +20,7 @@ import { WhitelistGroupsProvider } from "./hooks/useWhitelistGroups";
 // Set up API base URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
+// Create a new QueryClient instance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -33,8 +34,8 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <LogsProvider>
-        <WhitelistGroupsProvider>
+      <WhitelistGroupsProvider>
+        <LogsProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -51,8 +52,8 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-        </WhitelistGroupsProvider>
-      </LogsProvider>
+        </LogsProvider>
+      </WhitelistGroupsProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

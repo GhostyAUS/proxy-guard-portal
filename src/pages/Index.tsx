@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -26,7 +25,7 @@ export default function Dashboard() {
   const [apiRoutes, setApiRoutes] = useState<string[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(true);
   
-  const { groups, isLoading, error, fetchGroups, commitChanges } = useWhitelistGroups();
+  const { groups = [], isLoading = false, error = null, fetchGroups, commitChanges } = useWhitelistGroups();
   const { data: nginxStatus, isLoading: isLoadingStatus } = useNginxStatus();
   
   useEffect(() => {
@@ -52,9 +51,14 @@ export default function Dashboard() {
   const activeGroups = safeGroups.filter(group => group && group.enabled).length;
 
   const handleCommitChanges = async () => {
-    const success = await commitChanges();
-    if (success) {
-      fetchGroups();
+    try {
+      const success = await commitChanges();
+      if (success) {
+        fetchGroups();
+      }
+    } catch (err) {
+      console.error("Error committing changes:", err);
+      toast.error("Failed to apply changes");
     }
   };
   
