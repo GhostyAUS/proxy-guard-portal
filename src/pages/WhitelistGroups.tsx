@@ -31,6 +31,7 @@ import {
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import axios from "axios";
+import { v4 as uuidv4 } from "uuid"; // Explicitly import uuid
 
 export default function WhitelistGroups() {
   const location = useLocation();
@@ -175,12 +176,12 @@ export default function WhitelistGroups() {
         name: `Demo Group ${new Date().toLocaleTimeString()}`,
         description: "Automatically created demo group",
         clients: [
-          { id: crypto.randomUUID(), value: "10.0.0.1", description: "Demo Client 1" },
-          { id: crypto.randomUUID(), value: "192.168.1.0/24", description: "Demo Network" }
+          { id: uuidv4(), value: "10.0.0.1", description: "Demo Client 1" },
+          { id: uuidv4(), value: "192.168.1.0/24", description: "Demo Network" }
         ],
         destinations: [
-          { id: crypto.randomUUID(), value: "example.com", description: "Example Website" },
-          { id: crypto.randomUUID(), value: "api.example.org", description: "Example API" }
+          { id: uuidv4(), value: "example.com", description: "Example Website" },
+          { id: uuidv4(), value: "api.example.org", description: "Example API" }
         ],
         enabled: true
       };

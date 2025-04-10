@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -15,6 +14,7 @@ import { Layout } from "@/components/layout/Layout";
 import { mockWhitelistGroups, mockNginxStatus } from "@/utils/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { v4 as uuidv4 } from "uuid";
 
 export default function Dashboard() {
   const [whitelistGroups] = useState(mockWhitelistGroups);

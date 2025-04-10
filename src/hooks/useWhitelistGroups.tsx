@@ -15,7 +15,7 @@ interface WhitelistGroupsContextType {
   updateGroup: (updatedGroup: WhitelistGroup) => Promise<void>;
   deleteGroup: (id: string) => Promise<void>;
   getGroupById: (id: string) => WhitelistGroup | undefined;
-  addClientToGroup: (groupId: string, client: { value: string; description?: string }) => Promise<void>;
+  addClient: (groupId: string, client: { value: string; description?: string }) => Promise<void>;
   addDestinationToGroup: (groupId: string, destination: { value: string; description?: string }) => Promise<void>;
   removeClientFromGroup: (groupId: string, clientId: string) => Promise<void>;
   removeDestinationFromGroup: (groupId: string, destinationId: string) => Promise<void>;
@@ -37,10 +37,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     try {
       console.log("Fetching whitelist groups from API...");
       
-      // Add a timestamp query parameter to prevent caching
       const timestamp = new Date().getTime();
       
-      // Make API request with detailed error handling
       const response = await axios.get(`${API_BASE_URL}/whitelist-groups?t=${timestamp}`, {
         headers: {
           'Accept': 'application/json',
@@ -49,7 +47,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
           'Pragma': 'no-cache',
           'Expires': '0'
         },
-        validateStatus: status => true // Don't throw for any status code
+        validateStatus: status => true
       });
       
       console.log("Whitelist groups response status:", response.status);
@@ -59,18 +57,15 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         throw new Error(`API returned error status: ${response.status}`);
       }
       
-      // Initialize as empty array if no groups are returned
       let groupsData: WhitelistGroup[] = [];
       
       if (response.data && Array.isArray(response.data.groups)) {
         groupsData = response.data.groups;
         console.log(`Successfully loaded ${groupsData.length} groups from API`);
       } else if (response.data && Array.isArray(response.data)) {
-        // Handle case where API returns an array directly
         groupsData = response.data;
         console.log(`Successfully loaded ${groupsData.length} groups from direct array`);
       } else if (response.data && typeof response.data === 'object') {
-        // Try to find groups in response data
         for (const key in response.data) {
           if (Array.isArray(response.data[key])) {
             console.log(`Found array in response.data.${key}, using as groups`);
@@ -80,7 +75,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         }
       }
       
-      // Set groups with data sanitization
       const sanitizedGroups = groupsData.map(group => ({
         ...group,
         id: group.id || uuidv4(),
@@ -100,7 +94,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         description: "Could not retrieve groups from the server. Please try again."
       });
       
-      // Set empty array on error
       setGroups([]);
     } finally {
       setIsLoading(false);
@@ -111,13 +104,11 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     fetchGroups();
   }, []);
 
-  // Toggle group enabled/disabled status
   const toggleGroupEnabled = useCallback(async (id: string): Promise<void> => {
     try {
       setIsLoading(true);
       console.log("Toggling whitelist group enabled status:", id);
       
-      // Use the PATCH endpoint
       const timestamp = new Date().getTime();
       const response = await axios.patch(`${API_BASE_URL}/whitelist-groups/${id}/toggle?t=${timestamp}`, {}, {
         headers: {
@@ -133,7 +124,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       console.log("Toggle response:", response.data);
       
       if (response.data && response.data.success) {
-        // Update local state with the toggled group
         const updatedGroup = response.data.group;
         setGroups(prevGroups => 
           prevGroups.map(group => group.id === id ? updatedGroup : group)
@@ -144,7 +134,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
           { description: `${updatedGroup.name} has been ${updatedGroup.enabled ? 'enabled' : 'disabled'}` }
         );
       } else {
-        // If API doesn't return success or updated group, toggle locally
         setGroups(prevGroups => 
           prevGroups.map(group => {
             if (group.id === id) {
@@ -181,7 +170,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       
       console.log("Adding new whitelist group:", newGroup);
       
-      // Send to API with detailed error handling
       const timestamp = new Date().getTime();
       const response = await axios.post(`${API_BASE_URL}/whitelist-groups?t=${timestamp}`, newGroup, {
         headers: {
@@ -195,11 +183,9 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       });
       
       if (response.data && response.data.success) {
-        // Update local state with the returned group or the one we created
         const returnedGroup = response.data.group || newGroup;
         setGroups(prevGroups => [...prevGroups, returnedGroup]);
         
-        // Check if Nginx was reloaded
         if (response.data.nginxReloaded === false) {
           console.warn("Nginx was not reloaded:", response.data.error);
           toast.warning("Group created but Nginx configuration not updated", {
@@ -213,7 +199,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         
         return returnedGroup;
       } else {
-        // If API doesn't return success, add group locally
         setGroups(prevGroups => [...prevGroups, newGroup]);
         
         toast.success("Whitelist group created locally", {
@@ -238,7 +223,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       setIsLoading(true);
       console.log("Updating whitelist group:", updatedGroup);
       
-      // Send to API with detailed error handling
       const timestamp = new Date().getTime();
       const response = await axios.post(`${API_BASE_URL}/whitelist-groups?t=${timestamp}`, updatedGroup, {
         headers: {
@@ -252,12 +236,10 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       });
       
       if (response.data && response.data.success) {
-        // Update local state
         setGroups(prevGroups => 
           prevGroups.map(group => group.id === updatedGroup.id ? updatedGroup : group)
         );
         
-        // Check if Nginx was reloaded
         if (response.data.nginxReloaded === false) {
           console.warn("Nginx was not reloaded:", response.data.error);
           toast.warning("Group updated but Nginx configuration not updated", {
@@ -269,7 +251,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
           });
         }
       } else {
-        // If API doesn't return success, update group locally
         setGroups(prevGroups => 
           prevGroups.map(group => group.id === updatedGroup.id ? updatedGroup : group)
         );
@@ -294,7 +275,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       setIsLoading(true);
       console.log("Deleting whitelist group:", id);
       
-      // Send to API with detailed error handling
       const timestamp = new Date().getTime();
       const response = await axios.delete(`${API_BASE_URL}/whitelist-groups/${id}?t=${timestamp}`, {
         headers: {
@@ -309,11 +289,9 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       
       console.log("Delete response:", response?.data);
       
-      // Whether the API call was successful or not, update the local state
       setGroups(prevGroups => prevGroups.filter(group => group.id !== id));
       
       if (response.data && response.data.success) {
-        // Check if Nginx was reloaded
         if (response.data.nginxReloaded === false) {
           console.warn("Nginx was not reloaded:", response.data.error);
           toast.warning("Group deleted but Nginx configuration not updated", {
@@ -325,7 +303,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
           });
         }
       } else {
-        // If API call failed, still show success for local deletion
+        setGroups(prevGroups => prevGroups.filter(group => group.id !== id));
+        
         toast.success("Whitelist group deleted locally", {
           description: "The group has been removed from the local state"
         });
@@ -333,7 +312,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     } catch (err) {
       console.error("Error deleting group:", err);
       
-      // Even if the API request fails, still delete locally
       setGroups(prevGroups => prevGroups.filter(group => group.id !== id));
       
       toast.warning("Group may not be deleted on server", {
@@ -346,7 +324,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
 
   const getGroupById = useCallback((id: string) => groups.find(group => group.id === id), [groups]);
 
-  const addClientToGroup = useCallback(async (groupId: string, client: { value: string; description?: string }) => {
+  const addClient = useCallback(async (groupId: string, client: { value: string; description?: string }) => {
     try {
       setIsLoading(true);
       const group = getGroupById(groupId);
@@ -444,7 +422,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     updateGroup,
     deleteGroup,
     getGroupById,
-    addClientToGroup,
+    addClient,
     addDestinationToGroup,
     removeClientFromGroup,
     removeDestinationFromGroup,
