@@ -403,6 +403,7 @@ map $remote_addr $client_my-group {
                     <ul className="list-disc list-inside space-y-2 pl-4">
                       <li>Docker and Docker Compose installed on your system</li>
                       <li>Git to clone the repository</li>
+                      <li>GitHub account with access to the repository (may require personal access token)</li>
                     </ul>
                     
                     <h4 className="text-md font-medium pt-3">Directory Structure</h4>
@@ -428,9 +429,15 @@ map $remote_addr $client_my-group {
                     
                     <h4 className="text-md font-medium pt-3">Step 1: Clone the Repository</h4>
                     <pre className="bg-muted p-2 rounded-md text-sm mt-1">
-                      git clone https://github.com/GhostyAUS/proxy-guard.git
-                      cd proxy-guard
+                      git clone https://github.com/GhostyAUS/proxy-guard-portal.git /opt/proxy-guard
+                      cd /opt/proxy-guard
                     </pre>
+                    
+                    <p className="text-sm text-gray-500 mt-1">
+                      Note: You may need to replace "GhostyAUS" with your GitHub username and use a personal 
+                      access token if the repository is private. Alternatively, fork the repository to your 
+                      personal or company GitHub account.
+                    </p>
                     
                     <h4 className="text-md font-medium pt-3">Step 2: Configure Environment Variables</h4>
                     <p>
