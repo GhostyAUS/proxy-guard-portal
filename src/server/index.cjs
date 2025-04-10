@@ -3,7 +3,7 @@
  * API Server for Proxy Guard
  */
 const express = require('express');
-const nginxRouter = require('./nginx-service.js');
+const nginxRouter = require('./nginx-service.cjs');
 const fs = require('fs');
 const path = require('path');
 

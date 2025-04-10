@@ -31,7 +31,10 @@ else
       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
       next();
     });
-    app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+    app.get('/api/health', (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.json({ status: 'ok' });
+    });
     app.listen(PORT, () => console.log('Minimal API running on port ' + PORT));
   " &
   API_PID=$!

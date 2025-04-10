@@ -53,7 +53,8 @@ RUN if grep -q "\"build\":" package.json; then \
 
 # Create server directory if it doesn't exist and copy server files
 RUN mkdir -p /app/server
-COPY ./src/server /app/server/
+COPY ./src/server/index.cjs /app/server/
+COPY ./src/server/nginx-service.cjs /app/server/
 
 # Create the setup permissions script
 COPY app/setup-permissions.sh /app/setup-permissions.sh
