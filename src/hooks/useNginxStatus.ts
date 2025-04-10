@@ -12,12 +12,6 @@ export function useNginxStatus() {
     retryDelay: 1000,
     meta: {
       errorBoundary: false
-    },
-    // Using proper error handling for @tanstack/react-query v5+
-    onSettled: (_, error) => {
-      if (error) {
-        console.error('Error in useNginxStatus hook:', error);
-      }
     }
   });
 }
