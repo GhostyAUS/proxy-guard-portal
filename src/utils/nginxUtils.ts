@@ -6,7 +6,8 @@ import axios from "axios";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
- * Generates an NGINX configuration from whitelist groups
+ * Generates an NGINX configuration from whitelist groups using a simpler approach
+ * that avoids problematic map directives
  */
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
   console.log(`Generating nginx config from ${groups.length} groups`);
@@ -14,39 +15,49 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   // Start with the base template
   let config = configTemplate;
   
-  // Generate the map blocks for IPs and destinations
-  const mapBlocks = groups.filter(g => g.enabled).map(group => {
-    // Generate the client IPs map
-    const clientIpsMap = group.clients.map(client => 
-      `    ${client.value} 1;`
-    ).join('\n');
+  // Generate access variables
+  const accessVariables = groups.filter(g => g.enabled).flatMap(group => {
+    const variables = [];
     
-    // Generate the destinations map
-    const destinationsMap = group.destinations.map(dest => 
-      `    ${dest.value} 1;`
-    ).join('\n');
+    // Define variables for each client IP
+    group.clients.forEach((client, idx) => {
+      variables.push(`    set $client_${group.id}_${idx} 0;`);
+    });
     
-    // Make sure each map directive has proper formatting with variable, value pairs
-    return `
-# Group: ${group.name}
-map $remote_addr $client_${group.id} {
-    default 0;
-${clientIpsMap}
-}
-
-map $http_host $dest_${group.id} {
-    default 0;
-${destinationsMap}
-}`;
-  }).join('\n\n');
+    // Define variables for each destination
+    group.destinations.forEach((dest, idx) => {
+      variables.push(`    set $dest_${group.id}_${idx} 0;`);
+    });
+    
+    return variables;
+  }).join('\n');
   
-  // Generate the access condition for the server block
-  const accessConditions = groups.filter(g => g.enabled).map(group => 
-    `        if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
-  ).join('\n');
+  // Generate access conditions for the server block - a more direct approach without map
+  const accessConditions = groups.filter(g => g.enabled).flatMap(group => {
+    const conditions = [];
+    
+    // Add client IP check conditions
+    group.clients.forEach((client, clientIdx) => {
+      conditions.push(`        if ($remote_addr = ${client.value}) { set $client_${group.id}_${clientIdx} 1; }`);
+    });
+    
+    // Add host check conditions
+    group.destinations.forEach((dest, destIdx) => {
+      conditions.push(`        if ($http_host ~ "${dest.value}") { set $dest_${group.id}_${destIdx} 1; }`);
+    });
+    
+    // Add combined conditions that set allow_access
+    group.clients.forEach((_, clientIdx) => {
+      group.destinations.forEach((_, destIdx) => {
+        conditions.push(`        if ($client_${group.id}_${clientIdx} = 1 && $dest_${group.id}_${destIdx} = 1) { set $allow_access 1; }`);
+      });
+    });
+    
+    return conditions;
+  }).join('\n');
   
   // Replace placeholders in the template
-  config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
+  config = config.replace('# PLACEHOLDER:ACCESS_VARIABLES', accessVariables);
   config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
   
   console.log(`Generated nginx config with ${groups.filter(g => g.enabled).length} enabled groups`);
@@ -120,7 +131,7 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
   }
 };
 
-// Updated nginx combined proxy template
+// Updated nginx combined proxy template with simpler structure
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
 error_log /var/log/nginx/error.log info;
@@ -133,11 +144,9 @@ http {
     access_log /var/log/nginx/access.log;
     
     # Define variables for access control
-    map $remote_addr $allow_access {
-        default 0;
-    }
+    set $allow_access 0;
     
-# PLACEHOLDER:MAP_BLOCKS
+# PLACEHOLDER:ACCESS_VARIABLES
     
     server {
         listen 80 ssl http2;
@@ -152,7 +161,7 @@ http {
         ssl_session_timeout 10m;
         
         # Check if client is allowed to access the requested destination
-        # PLACEHOLDER:ACCESS_CONDITIONS
+# PLACEHOLDER:ACCESS_CONDITIONS
         
         # Block access if not allowed
         if ($allow_access != 1) {

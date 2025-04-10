@@ -10,11 +10,9 @@ http {
     access_log /var/log/nginx/access.log;
     
     # Define variables for access control
-    map $remote_addr $allow_access {
-        default 0;
-    }
+    set $allow_access 0;
     
-# PLACEHOLDER:MAP_BLOCKS
+# PLACEHOLDER:ACCESS_VARIABLES
     
     server {
         listen 80;
