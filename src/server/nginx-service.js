@@ -1,5 +1,7 @@
+
 /**
  * NGINX operations service for the Proxy Guard application
+ * Optimized for single container with direct filesystem access
  */
 const express = require('express');
 const fs = require('fs');
@@ -32,10 +34,12 @@ router.get('/nginx/status', async (req, res) => {
     // Check if nginx is running
     let isRunning = false;
     try {
-      await execPromise('pgrep nginx || echo "not running"');
-      isRunning = true;
+      const { stdout } = await execPromise('pgrep nginx || echo "not running"');
+      isRunning = !stdout.includes("not running");
+      console.log(`Nginx running status: ${isRunning}`);
     } catch (e) {
       // If command fails, nginx might not be running
+      console.error('Error checking nginx status:', e);
       isRunning = false;
     }
 
@@ -61,15 +65,19 @@ router.get('/nginx/status', async (req, res) => {
 
     // Test if config is valid
     let configValid = false;
+    let configMessage = 'Configuration not tested';
     try {
       if (configExists) {
-        await execPromise('nginx -t');
-        configValid = true;
-        console.log('Nginx config is valid');
+        const { stdout, stderr } = await execPromise('nginx -t 2>&1');
+        const output = stdout + stderr;
+        configValid = output.includes('syntax is ok') && output.includes('test is successful');
+        configMessage = configValid ? 'Configuration test successful' : 'Configuration test failed';
+        console.log('Nginx config test result:', configValid ? 'Valid' : 'Invalid');
       }
     } catch (e) {
-      console.log('Nginx config is invalid or not accessible');
+      console.log('Nginx config test error:', e.stderr || e.message);
       configValid = false;
+      configMessage = e.stderr || 'Configuration test failed';
     }
 
     // Check if config is writable
@@ -97,7 +105,7 @@ router.get('/nginx/status', async (req, res) => {
       lastModified: lastModified.toISOString(),
       lastConfigTest: {
         success: configValid,
-        message: configValid ? 'Configuration test successful' : 'Configuration test failed'
+        message: configMessage
       },
       configWritable,
       configExists
@@ -119,7 +127,7 @@ router.get('/nginx/config', (req, res) => {
     
     if (!fs.existsSync(configPath)) {
       console.log(`Config file doesn't exist, checking template`);
-      const templatePath = '/etc/nginx/nginx.conf.template';
+      const templatePath = process.env.NGINX_TEMPLATE_PATH || '/etc/nginx/nginx.conf.template';
       
       if (fs.existsSync(templatePath)) {
         console.log(`Using template file instead`);
@@ -145,7 +153,9 @@ router.post('/nginx/validate', async (req, res) => {
     // Set proper Content-Type header
     res.setHeader('Content-Type', 'application/json');
     
-    const { config, configPath = '/etc/nginx/nginx.conf' } = req.body;
+    const { config } = req.body;
+    const configPath = req.body.configPath || '/etc/nginx/nginx.conf';
+    
     console.log(`Validating nginx config, length: ${config?.length || 0}`);
     
     // Write config to a temp file
@@ -155,13 +165,24 @@ router.post('/nginx/validate', async (req, res) => {
     
     // Test the configuration with nginx -t
     try {
-      const result = await execPromise(`nginx -c ${tempFile} -t`);
-      console.log(`Nginx validation result: ${JSON.stringify(result)}`);
+      const { stdout, stderr } = await execPromise(`nginx -c ${tempFile} -t 2>&1`);
+      const output = stdout + stderr;
+      console.log(`Nginx validation output: ${output}`);
       
       // Clean up temp file
       fs.unlinkSync(tempFile);
       
-      res.json({ success: true });
+      // Check if test was successful
+      const isValid = output.includes('syntax is ok') && output.includes('test is successful');
+      
+      if (isValid) {
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          error: output || 'Configuration test failed with unknown error'
+        });
+      }
     } catch (execError) {
       // Clean up temp file
       if (fs.existsSync(tempFile)) {
@@ -267,8 +288,8 @@ router.post('/nginx/reload', async (req, res) => {
     
     // Execute nginx reload command
     try {
-      const result = await execPromise('nginx -s reload');
-      console.log('NGINX reload successful:', result);
+      const { stdout, stderr } = await execPromise('nginx -s reload 2>&1');
+      console.log('NGINX reload output:', stdout, stderr);
       res.json({ success: true });
     } catch (execError) {
       console.error('Error executing nginx reload command:', execError);
@@ -308,7 +329,7 @@ router.post('/nginx/htpasswd', async (req, res) => {
   }
 });
 
-// Parse nginx access logs and return structured data
+// Get access logs
 router.get('/logs', (req, res) => {
   try {
     const logPath = '/var/log/nginx/access.log';
@@ -416,8 +437,8 @@ router.get('/logs', (req, res) => {
   }
 });
 
-// Get whitelist groups from NGINX config
-router.get('/whitelist-groups', (req, res) => {
+// Get whitelist groups (updated for direct file access)
+router.get('/whitelist/groups', (req, res) => {
   try {
     // Set proper Content-Type header
     res.setHeader('Content-Type', 'application/json');
@@ -427,7 +448,7 @@ router.get('/whitelist-groups', (req, res) => {
     
     if (!fs.existsSync(configPath)) {
       console.log(`Config file not found at: ${configPath}, checking template`);
-      const templatePath = '/etc/nginx/nginx.conf.template';
+      const templatePath = process.env.NGINX_TEMPLATE_PATH || '/etc/nginx/nginx.conf.template';
       
       if (fs.existsSync(templatePath)) {
         console.log(`Using template file instead at: ${templatePath}`);
@@ -448,6 +469,43 @@ router.get('/whitelist-groups', (req, res) => {
     res.json({ groups });
   } catch (error) {
     console.error('Error getting whitelist groups:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update whitelist groups (added endpoint)
+router.post('/whitelist/groups', (req, res) => {
+  try {
+    const { groups } = req.body;
+    console.log(`Updating whitelist with ${groups?.length || 0} groups`);
+    
+    // Get the nginx configuration
+    const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
+    const templatePath = process.env.NGINX_TEMPLATE_PATH || '/etc/nginx/nginx.conf.template';
+    
+    let config;
+    // Try to read from config file first, fallback to template
+    if (fs.existsSync(configPath)) {
+      config = fs.readFileSync(configPath, 'utf8');
+    } else if (fs.existsSync(templatePath)) {
+      config = fs.readFileSync(templatePath, 'utf8');
+    } else {
+      return res.status(404).json({ error: 'No configuration file found' });
+    }
+    
+    // Generate whitelist configuration
+    const whitelistConfig = generateWhitelistConfig(groups);
+    
+    // Replace placeholder in template
+    const newConfig = config.replace(/# PLACEHOLDER:WHITELIST_CONFIG/, whitelistConfig);
+    
+    // Save the new configuration
+    fs.writeFileSync(configPath, newConfig);
+    
+    console.log('Whitelist groups updated successfully');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating whitelist groups:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -497,17 +555,55 @@ router.get('/debug/routes', (req, res) => {
   }
 });
 
-// Health check endpoint
-router.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    environment: {
-      NGINX_CONFIG_PATH: process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf',
-      API_BASE_URL: process.env.API_BASE_URL || '/api',
-      NODE_ENV: process.env.NODE_ENV
+// Get proxy settings
+router.get('/settings/proxy', (req, res) => {
+  try {
+    // Read from nginx config
+    const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
+    
+    let httpPort = "8080";
+    let httpsPort = "8443";
+    let maxUploadSize = "10m";
+    let sslCertPath = "/etc/nginx/certs/server.crt";
+    
+    if (fs.existsSync(configPath)) {
+      const config = fs.readFileSync(configPath, 'utf8');
+      
+      // Extract HTTP port
+      const httpPortMatch = config.match(/listen\s+(\d+)\s*;/);
+      if (httpPortMatch && httpPortMatch[1]) {
+        httpPort = httpPortMatch[1];
+      }
+      
+      // Extract HTTPS port
+      const httpsPortMatch = config.match(/listen\s+(\d+)\s+ssl/);
+      if (httpsPortMatch && httpsPortMatch[1]) {
+        httpsPort = httpsPortMatch[1];
+      }
+      
+      // Extract SSL cert path
+      const sslCertMatch = config.match(/ssl_certificate\s+(.*?);/);
+      if (sslCertMatch && sslCertMatch[1]) {
+        sslCertPath = sslCertMatch[1];
+      }
+      
+      // Extract max upload size
+      const maxUploadMatch = config.match(/client_max_body_size\s+(.*?);/);
+      if (maxUploadMatch && maxUploadMatch[1]) {
+        maxUploadSize = maxUploadMatch[1];
+      }
     }
-  });
+    
+    res.json({
+      httpPort,
+      httpsPort,
+      maxUploadSize,
+      sslCertPath
+    });
+  } catch (error) {
+    console.error('Error getting proxy settings:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Helper function to extract whitelist groups from NGINX config
@@ -516,7 +612,7 @@ function extractWhitelistGroups(config) {
   const groups = [];
   let currentGroup = null;
   
-  // Extract group comments and maps
+  // Extract group comments and if blocks
   const lines = config.split('\n');
   console.log(`Config has ${lines.length} lines`);
   
@@ -535,90 +631,73 @@ function extractWhitelistGroups(config) {
         destinations: [],
         enabled: true
       };
+      groups.push(currentGroup);
     }
     
-    // Check for client IPs map
-    if (line.startsWith('map $remote_addr $client_') && currentGroup) {
-      console.log(`Found client map for group: ${currentGroup.name}`);
-      const clientMapLines = getMapBlock(lines, i);
-      
-      // Extract client IPs
-      for (const mapLine of clientMapLines) {
-        const trimmedLine = mapLine.trim();
-        if (trimmedLine && !trimmedLine.startsWith('default') && trimmedLine.includes('1;')) {
-          const ipValue = trimmedLine.split(' ')[0];
+    // Check for if condition with client IP and destination
+    if (line.startsWith('if ($remote_addr =') && currentGroup) {
+      // Extract client IP and destination from the if condition
+      const ifMatch = line.match(/if \(\$remote_addr = (.*?) && \$http_host ~ "(.*?)"\)/);
+      if (ifMatch && ifMatch.length >= 3) {
+        const clientIP = ifMatch[1];
+        const destination = ifMatch[2];
+        
+        // Add client IP if not already in the list
+        if (!currentGroup.clients.some(client => client.value === clientIP)) {
           currentGroup.clients.push({
             id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            value: ipValue,
+            value: clientIP,
             description: ''
           });
-          console.log(`Added client IP: ${ipValue}`);
+          console.log(`Added client IP: ${clientIP}`);
         }
-      }
-      
-      // Skip processed lines
-      i += clientMapLines.length;
-    }
-    
-    // Check for destinations map
-    if (line.startsWith('map $http_host $dest_') && currentGroup) {
-      console.log(`Found destination map for group: ${currentGroup.name}`);
-      const destMapLines = getMapBlock(lines, i);
-      
-      // Extract destinations
-      for (const mapLine of destMapLines) {
-        const trimmedLine = mapLine.trim();
-        if (trimmedLine && !trimmedLine.startsWith('default') && trimmedLine.includes('1;')) {
-          const destValue = trimmedLine.split(' ')[0];
+        
+        // Add destination if not already in the list
+        if (!currentGroup.destinations.some(dest => dest.value === destination)) {
           currentGroup.destinations.push({
             id: `dest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            value: destValue,
+            value: destination,
             description: ''
           });
-          console.log(`Added destination: ${destValue}`);
+          console.log(`Added destination: ${destination}`);
         }
       }
-      
-      // Add group to list and reset current group
-      groups.push(currentGroup);
-      console.log(`Completed group: ${currentGroup.name}`);
-      currentGroup = null;
-      
-      // Skip processed lines
-      i += destMapLines.length;
     }
   }
   
   return groups;
 }
 
-// Helper function to get all lines in a map block
-function getMapBlock(lines, startIndex) {
-  const mapLines = [];
-  let bracesCount = 0;
-  let index = startIndex;
+// Helper function to generate whitelist configuration from groups
+function generateWhitelistConfig(groups) {
+  let config = '# IP and hostname whitelist configuration\n';
   
-  // Find opening brace
-  while (index < lines.length && !lines[index].includes('{')) {
-    index++;
+  if (!groups || groups.length === 0) {
+    return config + '# No whitelist groups configured\n';
   }
   
-  // Process block content
-  while (index < lines.length) {
-    const line = lines[index];
-    mapLines.push(line);
+  // Filter enabled groups
+  const enabledGroups = groups.filter(group => group.enabled);
+  
+  // Generate config for each group
+  enabledGroups.forEach(group => {
+    config += `\n# Group: ${group.name}\n`;
     
-    if (line.includes('{')) bracesCount++;
-    if (line.includes('}')) bracesCount--;
-    
-    if (bracesCount === 0 && mapLines.length > 1) {
-      break;
+    if (group.description) {
+      config += `# Description: ${group.description}\n`;
     }
     
-    index++;
-  }
+    // Generate if blocks for each client and destination combination
+    group.clients.forEach(client => {
+      group.destinations.forEach(dest => {
+        config += `if ($remote_addr = ${client.value} && $http_host ~ "${dest.value}") {\n`;
+        config += `    set $allow_access 1;\n`;
+        config += `}\n`;
+      });
+    });
+  });
   
-  return mapLines;
+  return config;
 }
 
 module.exports = router;

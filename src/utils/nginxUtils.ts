@@ -1,12 +1,14 @@
+
 import { WhitelistGroup } from "@/types/proxy";
 import axios from "axios";
+import api from "@/services/apiService";
 
 // API endpoint for nginx operations
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
  * Generates an NGINX configuration from whitelist groups
- * Uses a simplified approach without map directives
+ * Uses a simplified approach with if directives for access control
  */
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
   console.log(`Generating nginx config from ${groups.length} groups`);
@@ -21,6 +23,10 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   groups.filter(g => g.enabled).forEach(group => {
     // Add a comment for the group
     whitelistConfig += `\n# Group: ${group.name}\n`;
+    
+    if (group.description) {
+      whitelistConfig += `# Description: ${group.description}\n`;
+    }
     
     // For each client IP in the group
     group.clients.forEach(client => {
@@ -49,14 +55,10 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
 /**
  * Validates the NGINX configuration syntax
  */
-export const validateNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
+export const validateNginxConfig = async (config: string): Promise<boolean> => {
   try {
-    console.log(`Validating nginx config, path: ${configPath}, length: ${config.length}`);
-    const response = await axios.post(`${API_BASE_URL}/nginx/validate`, {
-      configPath,
-      config
-    });
-    
+    console.log(`Validating nginx config, length: ${config.length}`);
+    const response = await api.post('/nginx/validate', { config });
     return response.data.success === true;
   } catch (error) {
     console.error("Error validating NGINX config:", error);
@@ -65,16 +67,12 @@ export const validateNginxConfig = async (configPath: string, config: string): P
 };
 
 /**
- * Saves the NGINX configuration to the specified file
+ * Saves the NGINX configuration to the server
  */
-export const saveNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
+export const saveNginxConfig = async (config: string): Promise<boolean> => {
   try {
-    console.log(`Saving nginx config, path: ${configPath}, length: ${config.length}`);
-    const response = await axios.post(`${API_BASE_URL}/nginx/save`, {
-      configPath,
-      config
-    });
-    
+    console.log(`Saving nginx config, length: ${config.length}`);
+    const response = await api.post('/nginx/save', { config });
     return response.data.success === true;
   } catch (error) {
     console.error("Error saving NGINX config:", error);
@@ -88,7 +86,7 @@ export const saveNginxConfig = async (configPath: string, config: string): Promi
 export const reloadNginxConfig = async (): Promise<boolean> => {
   try {
     console.log("Reloading nginx configuration");
-    const response = await axios.post(`${API_BASE_URL}/nginx/reload`);
+    const response = await api.post('/nginx/reload');
     return response.data.success === true;
   } catch (error) {
     console.error("Error reloading NGINX:", error);
@@ -102,10 +100,7 @@ export const reloadNginxConfig = async (): Promise<boolean> => {
 export const testConfigWritable = async (configPath: string): Promise<boolean> => {
   try {
     console.log(`Testing if config is writable: ${configPath}`);
-    const response = await axios.post(`${API_BASE_URL}/nginx/test-writable`, {
-      configPath
-    });
-    
+    const response = await api.post('/nginx/test-writable', { configPath });
     return response.data.writable === true;
   } catch (error) {
     console.error("Error testing if config is writable:", error);
@@ -113,7 +108,7 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
   }
 };
 
-// Updated nginx template with simplified whitelist approach
+// Default nginx template with simplified whitelist approach
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
 error_log /var/log/nginx/error.log info;
@@ -123,7 +118,11 @@ events {
 }
 
 http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    
     access_log /var/log/nginx/access.log;
+    client_max_body_size 10m;
     
     # Define variable for access control
     set $allow_access 0;
@@ -131,10 +130,37 @@ http {
     # IP and hostname whitelist configurations will be inserted here
     # PLACEHOLDER:WHITELIST_CONFIG
     
+    # Proxy API requests to the Node.js backend
     server {
-        listen 80 ssl http2;
+        listen 80;
+        server_name localhost;
         
-        # SSL configuration for HTTPS
+        # API proxy for backend services
+        location /api/ {
+            proxy_pass http://localhost:3001/api/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_cache_bypass $http_upgrade;
+        }
+        
+        # Serve frontend static files
+        location / {
+            root /app/dist;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+        }
+    }
+    
+    server {
+        # Forward proxy server
+        listen 8080;
+        http2 on;
+        
+        # SSL configuration
         ssl_certificate /etc/nginx/certs/server.crt;
         ssl_certificate_key /etc/nginx/certs/server.key;
         ssl_protocols TLSv1.2 TLSv1.3;
@@ -175,31 +201,27 @@ http {
 `;
 
 /**
- * Create a backend API service to handle NGINX operations
- */
-export const createAPIService = async (backendUrl: string): Promise<boolean> => {
-  try {
-    const response = await axios.post(`${backendUrl}/setup`, {
-      type: 'nginx'
-    });
-    return response.data.success === true;
-  } catch (error) {
-    console.error("Error setting up API service:", error);
-    throw new Error("Failed to set up API service for NGINX operations");
-  }
-};
-
-/**
  * Generates htpasswd file for basic authentication
  */
 export const generateHtpasswd = async (users: { username: string, password: string }[]): Promise<boolean> => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/nginx/htpasswd`, {
-      users
-    });
+    const response = await api.post('/nginx/htpasswd', { users });
     return response.data.success === true;
   } catch (error) {
     console.error("Error generating htpasswd file:", error);
     throw new Error("Failed to generate htpasswd file");
+  }
+};
+
+/**
+ * Fetches and parses Nginx logs
+ */
+export const fetchNginxLogs = async () => {
+  try {
+    const response = await api.get('/logs');
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching Nginx logs:", error);
+    return { logs: [], stats: {} };
   }
 };

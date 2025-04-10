@@ -10,6 +10,7 @@ services:
     network_mode: "host"
     environment:
       - NGINX_CONFIG_PATH=/etc/nginx/nginx.conf
+      - NGINX_TEMPLATE_PATH=/etc/nginx/nginx.conf.template
       - API_BASE_URL=http://localhost:3001
       - VITE_API_BASE_URL=/api
       - API_PORT=3001
@@ -25,12 +26,13 @@ services:
       - CLIENT_AUTH_METHOD=${CLIENT_AUTH_METHOD:-none}
       - CLIENT_AUTH_REALM=${CLIENT_AUTH_REALM:-Proxy Access}
       - SINGLE_CONTAINER=true
+      - APP_USER=node
     volumes:
       - nginx_config:/etc/nginx:rw
       - nginx_logs:/var/log/nginx:rw
       - nginx_certs:/etc/nginx/certs:rw
     restart: unless-stopped
-    command: ["/bin/sh", "-c", "nginx && /app/start.sh"]
+    command: ["/bin/sh", "-c", "/app/setup-permissions.sh && nginx && /app/start.sh"]
 
 networks:
   proxy-network:

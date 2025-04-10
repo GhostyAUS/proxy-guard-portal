@@ -60,6 +60,16 @@ export async function fetchWhitelistGroups(): Promise<WhitelistGroup[]> {
   }
 }
 
+export async function updateWhitelistGroups(groups: WhitelistGroup[]): Promise<boolean> {
+  try {
+    const response = await api.post('/whitelist/groups', { groups });
+    return response.data.success === true;
+  } catch (error) {
+    console.error('Error updating whitelist groups:', error);
+    throw new Error('Failed to update whitelist groups');
+  }
+}
+
 export async function fetchNginxStatus(): Promise<NginxStatus> {
   try {
     console.log("Fetching nginx status from:", `${API_BASE_URL}/nginx/status`);
@@ -79,6 +89,36 @@ export async function fetchNginxStatus(): Promise<NginxStatus> {
       configWritable: false,
       configExists: false
     };
+  }
+}
+
+export async function fetchNginxConfig(): Promise<{config: string, isTemplate?: boolean}> {
+  try {
+    const response = await api.get('/nginx/config');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching nginx config:', error);
+    return { config: '', isTemplate: false };
+  }
+}
+
+export async function saveNginxConfig(config: string): Promise<boolean> {
+  try {
+    const response = await api.post('/nginx/save', { config });
+    return response.data.success === true;
+  } catch (error) {
+    console.error('Error saving nginx config:', error);
+    throw new Error('Failed to save nginx configuration');
+  }
+}
+
+export async function reloadNginxConfig(): Promise<boolean> {
+  try {
+    const response = await api.post('/nginx/reload');
+    return response.data.success === true;
+  } catch (error) {
+    console.error('Error reloading nginx:', error);
+    throw new Error('Failed to reload nginx configuration');
   }
 }
 
@@ -107,6 +147,16 @@ export async function fetchApiRoutes() {
   } catch (error) {
     console.error('Error fetching API routes:', error);
     return [];
+  }
+}
+
+export async function generateHtpasswd(users: {username: string, password: string}[]): Promise<boolean> {
+  try {
+    const response = await api.post('/nginx/htpasswd', { users });
+    return response.data.success === true;
+  } catch (error) {
+    console.error('Error generating htpasswd file:', error);
+    throw new Error('Failed to generate htpasswd file');
   }
 }
 
