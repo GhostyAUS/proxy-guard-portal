@@ -5,6 +5,12 @@ echo "Starting services in single container mode..."
 echo "Current directory: $(pwd)"
 echo "Files in current directory: $(ls -la)"
 
+# Make sure nginx config exists
+if [ ! -f "/etc/nginx/nginx.conf" ] && [ -f "/etc/nginx/nginx.conf.template" ]; then
+  echo "Copying nginx.conf.template to nginx.conf..."
+  cp /etc/nginx/nginx.conf.template /etc/nginx/nginx.conf
+fi
+
 # Start the backend API server
 NODE_ENV=production node /app/server/index.cjs &
 API_PID=$!
