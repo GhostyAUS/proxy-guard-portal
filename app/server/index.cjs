@@ -154,34 +154,37 @@ const updateNginxConfig = () => {
     const nginxConfigTemplate = fs.readFileSync('/etc/nginx/nginx.conf.template', 'utf8');
     console.log("Read nginx template file, generating configuration...");
     
-    // Generate geo blocks for IP matching
-    const geoBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
-      // For each group, create a geo block that maps IPs to variables
-      const geoBlock = `
-# Group: ${group.name}
-geo $remote_addr $client_${group.id} {
-    default 0;
-${group.clients.map(client => `    ${client.value} 1;`).join('\n')}
-}`;
+    // Create a single whitelist configuration block
+    let whitelistConfig = "";
+    
+    // For each enabled group
+    whitelistGroups.filter(g => g.enabled).forEach(group => {
+      // Add a comment for the group
+      whitelistConfig += `\n# Group: ${group.name}\n`;
       
-      return geoBlock;
-    }).join('\n\n');
+      // For each client IP in the group
+      group.clients.forEach(client => {
+        // For each destination in the group
+        group.destinations.forEach(dest => {
+          // Create an if block that checks both the client IP and host
+          whitelistConfig += `if ($remote_addr = ${client.value} && $http_host ~ "${dest.value}") {\n`;
+          whitelistConfig += `    set $allow_access 1;\n`;
+          whitelistConfig += `}\n\n`;
+        });
+      });
+    });
     
-    // Generate access conditions to check both client IP and destination
-    const accessConditions = whitelistGroups.filter(g => g.enabled).flatMap(group => {
-      return group.destinations.map(dest => 
-        `        if ($client_${group.id} = 1 && $http_host ~ "${dest.value}") { set $allow_access 1; }`
-      );
-    }).join('\n');
+    // If no whitelist configs were generated, add a comment
+    if (whitelistConfig.trim() === "") {
+      whitelistConfig = "\n# No whitelist groups enabled\n";
+    }
     
-    // Replace placeholders in the template
+    // Replace placeholder in the template with our generated config
     let config = nginxConfigTemplate;
-    config = config.replace('# PLACEHOLDER:GEO_BLOCKS', geoBlocks);
-    config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
+    config = config.replace('# PLACEHOLDER:WHITELIST_CONFIG', whitelistConfig);
     
     console.log("Generated NGINX config with:");
     console.log(`- ${whitelistGroups.filter(g => g.enabled).length} enabled groups`);
-    console.log(`- ${accessConditions.split('\n').length} access conditions`);
     
     // Log the first few lines of the generated config for debugging
     const configLines = config.split('\n');

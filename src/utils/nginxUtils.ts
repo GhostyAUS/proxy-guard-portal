@@ -5,8 +5,8 @@ import axios from "axios";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
- * Generates an NGINX configuration from whitelist groups using geo directives
- * for IP matching and if statements for host matching
+ * Generates an NGINX configuration from whitelist groups
+ * Uses a simplified approach without map directives
  */
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
   console.log(`Generating nginx config from ${groups.length} groups`);
@@ -14,29 +14,33 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   // Start with the base template
   let config = configTemplate;
   
-  // Generate geo blocks for IP matching - one geo block per group
-  const geoBlocks = groups.filter(g => g.enabled).map(group => {
-    // For each group, create a geo block that maps IPs to variables
-    const geoBlock = `
-# Group: ${group.name}
-geo $remote_addr $client_${group.id} {
-    default 0;
-${group.clients.map(client => `    ${client.value} 1;`).join('\n')}
-}`;
+  // Create a single whitelist configuration block
+  let whitelistConfig = "";
+  
+  // For each enabled group
+  groups.filter(g => g.enabled).forEach(group => {
+    // Add a comment for the group
+    whitelistConfig += `\n# Group: ${group.name}\n`;
     
-    return geoBlock;
-  }).join('\n\n');
+    // For each client IP in the group
+    group.clients.forEach(client => {
+      // For each destination in the group
+      group.destinations.forEach(dest => {
+        // Create an if block that checks both the client IP and host
+        whitelistConfig += `if ($remote_addr = ${client.value} && $http_host ~ "${dest.value}") {\n`;
+        whitelistConfig += `    set $allow_access 1;\n`;
+        whitelistConfig += `}\n\n`;
+      });
+    });
+  });
   
-  // Generate access conditions to check both client IP and destination
-  const accessConditions = groups.filter(g => g.enabled).flatMap(group => {
-    return group.destinations.map(dest => 
-      `        if ($client_${group.id} = 1 && $http_host ~ "${dest.value}") { set $allow_access 1; }`
-    );
-  }).join('\n');
+  // If no whitelist configs were generated, add a comment
+  if (whitelistConfig.trim() === "") {
+    whitelistConfig = "\n# No whitelist groups enabled\n";
+  }
   
-  // Replace placeholders in the template
-  config = config.replace('# PLACEHOLDER:GEO_BLOCKS', geoBlocks);
-  config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
+  // Replace placeholder in the template with our generated config
+  config = config.replace('# PLACEHOLDER:WHITELIST_CONFIG', whitelistConfig);
   
   console.log(`Generated nginx config with ${groups.filter(g => g.enabled).length} enabled groups`);
   return config;
@@ -109,7 +113,7 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
   }
 };
 
-// Updated nginx template without map directives
+// Updated nginx template with simplified whitelist approach
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
 error_log /var/log/nginx/error.log info;
@@ -124,8 +128,8 @@ http {
     # Define variable for access control
     set $allow_access 0;
     
-    # Use geo module for IP matching
-# PLACEHOLDER:GEO_BLOCKS
+    # IP and hostname whitelist configurations will be inserted here
+    # PLACEHOLDER:WHITELIST_CONFIG
     
     server {
         listen 80 ssl http2;
@@ -138,9 +142,6 @@ http {
         ssl_prefer_server_ciphers on;
         ssl_session_cache shared:SSL:10m;
         ssl_session_timeout 10m;
-        
-        # Check allowed destinations and set access flag
-# PLACEHOLDER:ACCESS_CONDITIONS
         
         # Block access if not allowed
         if ($allow_access != 1) {
