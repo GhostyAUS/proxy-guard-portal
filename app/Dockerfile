@@ -72,19 +72,16 @@ RUN echo "Checking package.json for start script:" && \
 # Make sure the start script is available and show final package.json
 RUN echo "Final package.json content:" && cat package.json
 
-# Create a startup script to run both frontend and backend
-RUN echo '#!/bin/sh\n\
-# Start the backend API server\n\
-node server/index.js &\n\
-\n\
-# Start the frontend\n\
-npm start\n'\
-> /app/start.sh && chmod +x /app/start.sh
+# Create the start.sh script directly in the final image
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo '# Start the backend API server' >> /app/start.sh && \
+    echo 'node server/index.js &' >> /app/start.sh && \
+    echo '# Start the frontend' >> /app/start.sh && \
+    echo 'npm start' >> /app/start.sh
 
-# Ensure the script is executable
+# Ensure the script exists and is executable
 RUN chmod +x /app/start.sh
-
-# Display the script to verify its contents
+RUN ls -la /app/start.sh
 RUN cat /app/start.sh
 
 # Expose port
