@@ -6,14 +6,14 @@ echo "Current directory: $(pwd)"
 echo "Files in current directory: $(ls -la)"
 
 # Start the backend API server if it exists
-if [ -f "/app/server/index.js" ]; then
+if [ -f "/app/server/index.cjs" ]; then
   echo "Starting API server..."
   echo "Server file contents (first 10 lines):"
-  head -n 10 /app/server/index.js
+  head -n 10 /app/server/index.cjs
   
-  echo "Starting API server in Node.js ESM mode..."
-  # Use node --no-warnings to suppress ESM warnings
-  node --no-warnings /app/server/index.js &
+  echo "Starting API server in Node.js CommonJS mode..."
+  # No need for --no-warnings as we're using proper .cjs extension now
+  node /app/server/index.cjs &
   API_PID=$!
   echo "API server started with PID: $API_PID"
   
@@ -30,7 +30,7 @@ if [ -f "/app/server/index.js" ]; then
 else
   echo "WARNING: API server file not found, skipping backend startup"
   echo "Contents of /app directory:"
-  find /app -type f -name "*.js" | sort
+  find /app -type f -name "*.js" -o -name "*.cjs" | sort
 fi
 
 # Create a simple package.json with a start script if it doesn't exist
