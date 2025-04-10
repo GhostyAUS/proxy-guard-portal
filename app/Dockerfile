@@ -38,6 +38,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Debug: Show what's in the environment
+RUN echo "Environment variables:" && env | sort
+
 # Install nginx for configuration testing
 RUN apk add --no-cache nginx
 
@@ -52,26 +55,37 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
 
-# Check if server directory exists in the source and copy it if it does
-COPY --from=build /app/src/server ./server 2>/dev/null || echo "Server directory not found, creating minimal server"
+# Create server directory
+RUN mkdir -p /app/server
+
+# Copy server files from the app/server directory if they exist in the build context
+COPY --from=build /app/app/server/index.js /app/server/ || echo "No custom server/index.js found, will create minimal version"
+
+# Copy start script from app directory if it exists
+COPY --from=build /app/app/start.sh /app/ || echo "No custom start.sh found, will create minimal version"
 
 # Create a minimal server file if it doesn't exist
-RUN mkdir -p /app/server
 RUN if [ ! -f "/app/server/index.js" ]; then \
-    printf 'console.log("Creating minimal API server");\n\
-const express = require("express");\n\
-const app = express();\n\
-const PORT = process.env.API_PORT || 3001;\n\
-\n\
-app.use(express.json());\n\
-\n\
-app.get("/api/health", (req, res) => {\n\
-  res.json({ status: "ok", timestamp: new Date() });\n\
-});\n\
-\n\
-app.listen(PORT, () => {\n\
-  console.log(`API Server running on port ${PORT}`);\n\
-});\n' > /app/server/index.js; \
+      echo "Creating minimal server/index.js file..." && \
+      echo 'console.log("Creating minimal API server");' > /app/server/index.js && \
+      echo 'const express = require("express");' >> /app/server/index.js && \
+      echo 'const app = express();' >> /app/server/index.js && \
+      echo 'const PORT = process.env.API_PORT || 3001;' >> /app/server/index.js && \
+      echo '' >> /app/server/index.js && \
+      echo 'app.use(express.json());' >> /app/server/index.js && \
+      echo '' >> /app/server/index.js && \
+      echo 'app.get("/api/health", (req, res) => {' >> /app/server/index.js && \
+      echo '  res.json({ status: "ok", timestamp: new Date() });' >> /app/server/index.js && \
+      echo '});' >> /app/server/index.js && \
+      echo '' >> /app/server/index.js && \
+      echo 'app.listen(PORT, () => {' >> /app/server/index.js && \
+      echo '  console.log(`API Server running on port ${PORT}`);' >> /app/server/index.js && \
+      echo '});' >> /app/server/index.js && \
+      echo "Minimal server/index.js created successfully. Contents:" && \
+      cat /app/server/index.js; \
+    else \
+      echo "Using existing server/index.js. Contents:" && \
+      cat /app/server/index.js; \
     fi
 
 # Create a minimal start script if it doesn't exist
@@ -93,24 +107,40 @@ RUN echo "Checking package.json for start script:" && \
 # Make sure the start script is available and show final package.json
 RUN echo "Final package.json content:" && cat package.json
 
-# Create the start.sh script with better error handling
-RUN printf '#!/bin/sh\n\
-\n\
-# Start the backend API server if it exists\n\
-if [ -f "/app/server/index.js" ]; then\n\
-  echo "Starting API server..."\n\
-  node /app/server/index.js &\n\
-else\n\
-  echo "WARNING: API server file not found, skipping backend startup"\n\
-fi\n\
-\n\
-# Start the frontend\n\
-echo "Starting frontend..."\n\
-npm start\n' > /app/start.sh
+# Create the start.sh script with better error handling if it doesn't exist
+RUN if [ ! -f "/app/start.sh" ]; then \
+      echo "Creating minimal start.sh file..." && \
+      echo '#!/bin/sh' > /app/start.sh && \
+      echo '' >> /app/start.sh && \
+      echo '# Start the backend API server if it exists' >> /app/start.sh && \
+      echo 'if [ -f "/app/server/index.js" ]; then' >> /app/start.sh && \
+      echo '  echo "Starting API server..."' >> /app/start.sh && \
+      echo '  node /app/server/index.js &' >> /app/start.sh && \
+      echo 'else' >> /app/start.sh && \
+      echo '  echo "WARNING: API server file not found, skipping backend startup"' >> /app/start.sh && \
+      echo 'fi' >> /app/start.sh && \
+      echo '' >> /app/start.sh && \
+      echo '# Start the frontend' >> /app/start.sh && \
+      echo 'echo "Starting frontend..."' >> /app/start.sh && \
+      echo 'npm start' >> /app/start.sh && \
+      echo "Minimal start.sh created successfully. Contents:" && \
+      cat /app/start.sh; \
+    else \
+      echo "Using existing start.sh. Contents:" && \
+      cat /app/start.sh; \
+    fi
 
 # Ensure the script exists and is executable
 RUN chmod +x /app/start.sh
 RUN ls -la /app/start.sh
+RUN echo "Final check - start.sh exists and is executable:" && \
+    if [ -x "/app/start.sh" ]; then echo "✅ start.sh is ready"; else echo "❌ start.sh issues detected"; exit 1; fi
+
+# Final validation
+RUN echo "Validating all required files exist:"
+RUN test -f "/app/server/index.js" && echo "✅ server/index.js exists" || (echo "❌ server/index.js missing"; exit 1)
+RUN test -f "/app/start.sh" && echo "✅ start.sh exists" || (echo "❌ start.sh missing"; exit 1)
+RUN test -f "/app/package.json" && echo "✅ package.json exists" || (echo "❌ package.json missing"; exit 1)
 
 # Expose port
 EXPOSE 3000
