@@ -32,7 +32,7 @@ export default function Dashboard() {
   });
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   
-  const { groups: whitelistGroups, isLoading, error, fetchGroups, commitChanges } = useWhitelistGroups();
+  const { groups, isLoading, error, fetchGroups, commitChanges } = useWhitelistGroups();
   
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";
@@ -55,7 +55,7 @@ export default function Dashboard() {
     fetchNginxStatus();
   }, []);
 
-  const activeGroups = whitelistGroups.filter(group => group.enabled).length;
+  const activeGroups = groups?.filter(group => group.enabled).length || 0;
 
   const handleCommitChanges = async () => {
     const success = await commitChanges();
@@ -87,9 +87,9 @@ export default function Dashboard() {
               <ListFilter className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{whitelistGroups.length}</div>
+              <div className="text-2xl font-bold">{groups?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
-                {activeGroups} active, {whitelistGroups.length - activeGroups} inactive
+                {activeGroups} active, {(groups?.length || 0) - activeGroups} inactive
               </p>
             </CardContent>
           </Card>
@@ -195,7 +195,7 @@ export default function Dashboard() {
                 </div>
                 <h3 className="text-lg font-medium">Error Loading Groups</h3>
                 <p className="text-sm text-center text-muted-foreground max-w-md">
-                  {error}
+                  {error instanceof Error ? error.message : "An unknown error occurred"}
                 </p>
                 <div className="flex gap-2 mt-2">
                   <Button variant="outline" onClick={() => fetchGroups()}>
@@ -210,7 +210,7 @@ export default function Dashboard() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {whitelistGroups.map((group) => (
+            {groups && groups.map((group) => (
               <Card key={group.id} className="overflow-hidden">
                 <CardHeader>
                   <div className="flex items-center justify-between">

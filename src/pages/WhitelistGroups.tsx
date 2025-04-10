@@ -165,10 +165,10 @@ export default function WhitelistGroups() {
     }
   };
 
-  const filteredGroups = groups.filter(group => 
+  const filteredGroups = groups?.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  ) || [];
 
   const handleCreateDemoGroup = async () => {
     try {
@@ -233,8 +233,8 @@ export default function WhitelistGroups() {
                     <div className="flex flex-col gap-2 text-sm">
                       <div><strong>API Base URL:</strong> {import.meta.env.VITE_API_BASE_URL || "/api"}</div>
                       <div><strong>Loading State:</strong> {isLoading ? "True" : "False"}</div>
-                      <div><strong>Error:</strong> {error || "None"}</div>
-                      <div><strong>Groups Count:</strong> {groups.length}</div>
+                      <div><strong>Error:</strong> {error instanceof Error ? error.message : error ? String(error) : "None"}</div>
+                      <div><strong>Groups Count:</strong> {groups?.length || 0}</div>
                       <div><strong>Last Refreshed:</strong> {new Date(lastRefreshed).toLocaleString()}</div>
                     </div>
                     <div className="mt-2 space-x-2">
@@ -419,7 +419,9 @@ export default function WhitelistGroups() {
               <div className="rounded-md bg-destructive/10 p-4 text-center flex flex-col items-center">
                 <AlertCircle className="h-6 w-6 text-destructive mb-2" />
                 <p className="text-destructive font-medium">Failed to load groups</p>
-                <p className="text-destructive/80 text-sm mb-2">{error}</p>
+                <p className="text-destructive/80 text-sm mb-2">
+                  {error instanceof Error ? error.message : String(error)}
+                </p>
                 <Button 
                   variant="outline" 
                   className="mt-2"
@@ -509,7 +511,7 @@ export default function WhitelistGroups() {
           </CardContent>
           {filteredGroups.length > 0 && (
             <CardFooter className="text-sm text-muted-foreground">
-              Showing {filteredGroups.length} of {groups.length} groups
+              Showing {filteredGroups.length} of {groups?.length || 0} groups
             </CardFooter>
           )}
         </Card>
