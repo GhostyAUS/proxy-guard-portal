@@ -544,6 +544,118 @@ networks:
 volumes:
   nginx_config:`}
                     </pre>
+
+                    <h4 className="text-md font-medium pt-3">Upgrading an Existing Deployment</h4>
+                    <p>
+                      To upgrade your Proxy Guard installation to the latest version:
+                    </p>
+                    
+                    <ol className="list-decimal list-inside space-y-2 pl-4">
+                      <li>
+                        Back up your current configuration:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`# Back up environment variables
+cp variables.env variables.env.backup
+
+# Back up certificates
+cp -r nginx/certs nginx/certs.backup
+
+# Export volume data (if needed)
+docker run --rm -v proxy-guard_nginx_config:/data -v $(pwd):/backup alpine tar -czvf /backup/nginx_config_backup.tar.gz /data`}
+                        </pre>
+                      </li>
+                      
+                      <li>
+                        Pull the latest changes from the repository:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`# Navigate to your installation directory
+cd /opt/proxy-guard
+
+# Pull the latest changes
+git fetch --all
+git reset --hard origin/main  # Or your specific branch`}
+                        </pre>
+                      </li>
+                      
+                      <li>
+                        Update your environment variables if necessary:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`# Check for any new environment variables
+diff variables.env.backup variables.env.example
+
+# Update your variables.env file with any new required variables
+nano variables.env`}
+                        </pre>
+                      </li>
+                      
+                      <li>
+                        Rebuild and restart the containers with the latest code:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`# Stop existing containers
+docker-compose down
+
+# Rebuild images with no-cache to ensure latest dependencies
+docker-compose build --no-cache
+
+# Start the updated containers
+docker-compose --env-file variables.env up -d`}
+                        </pre>
+                      </li>
+                      
+                      <li>
+                        Verify the upgrade:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`# Check container status
+docker-compose ps
+
+# Check logs for any errors
+docker-compose logs -f`}
+                        </pre>
+                      </li>
+                    </ol>
+                    
+                    <h4 className="text-md font-medium pt-3">Rolling Back an Upgrade</h4>
+                    <p>
+                      If you encounter issues after an upgrade:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-2 pl-4">
+                      <li>
+                        Stop the current containers:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+                          docker-compose down
+                        </pre>
+                      </li>
+                      
+                      <li>
+                        Revert to your previous git commit:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`# Find the previous commit hash
+git log --oneline
+
+# Revert to that commit
+git reset --hard <previous-commit-hash>`}
+                        </pre>
+                      </li>
+                      
+                      <li>
+                        Restore your backup files:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`# Restore environment variables
+cp variables.env.backup variables.env
+
+# Restore backup volume data if needed
+docker run --rm -v proxy-guard_nginx_config:/data -v $(pwd):/backup alpine sh -c "rm -rf /data/* && tar -xzvf /backup/nginx_config_backup.tar.gz -C /"`}
+                        </pre>
+                      </li>
+                      
+                      <li>
+                        Rebuild and restart with the previous version:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+{`docker-compose build
+docker-compose --env-file variables.env up -d`}
+                        </pre>
+                      </li>
+                    </ol>
                     
                     <h4 className="text-md font-medium pt-3">Using a Custom Environment File</h4>
                     <p>
