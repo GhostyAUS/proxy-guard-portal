@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { ArrowRight, CheckCircle2, Server, XCircle } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
@@ -197,6 +196,16 @@ export default function HttpProxy() {
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
                     export HTTP_PROXY=http://your-server-ip:8080
                     export HTTPS_PROXY=http://your-server-ip:8080
+                  </pre>
+                </div>
+                
+                <div className="rounded-md border p-3 mt-2">
+                  <h4 className="text-xs font-medium mb-1">Accessing Web UI</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Since the app is running in host network mode, access the web UI directly via:
+                  </p>
+                  <pre className="bg-muted p-2 rounded text-xs overflow-x-auto mt-1">
+                    http://your-server-ip:3000
                   </pre>
                 </div>
                 

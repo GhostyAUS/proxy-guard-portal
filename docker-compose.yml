@@ -22,8 +22,11 @@ services:
       - CLIENT_AUTH_REALM=${CLIENT_AUTH_REALM:-Proxy Access}
     volumes:
       - nginx_config:/etc/nginx
+    ports:
+      - "3000:3000"
     depends_on:
       - nginx-proxy
+    restart: unless-stopped
 
   # Nginx proxy service
   nginx-proxy:
