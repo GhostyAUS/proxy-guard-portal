@@ -7,7 +7,7 @@ WORKDIR /app
 ARG NPM_FLAGS="--legacy-peer-deps"
 
 # Install nginx and other required packages
-RUN apk add --no-cache nginx curl bash openssl sudo
+RUN apk add --no-cache nginx curl bash openssl sudo busybox
 
 # Create directories for NGINX operations
 RUN mkdir -p /etc/nginx
@@ -66,6 +66,10 @@ RUN chmod +x /app/start.sh
 
 # Create api-server directory for shell-based API
 RUN mkdir -p /app/api-server
+
+# Create the nginx-manager.sh script
+COPY app/nginx-manager.sh /app/nginx-manager.sh
+RUN chmod +x /app/nginx-manager.sh
 
 # Expose necessary ports
 EXPOSE 3001 8080 8443
