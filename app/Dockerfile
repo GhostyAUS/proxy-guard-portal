@@ -4,7 +4,7 @@ FROM node:18-alpine AS build
 WORKDIR /app
 
 # Add build argument for npm flags
-ARG NPM_FLAGS=""
+ARG NPM_FLAGS="--legacy-peer-deps"
 
 # Copy necessary files
 COPY . .
@@ -12,7 +12,7 @@ COPY . .
 # Debug what's in the directory
 RUN echo "Current working directory contents:" && ls -la
 
-# Install dependencies
+# Install dependencies with --legacy-peer-deps flag to bypass peer dependency conflicts
 RUN if [ -f "package.json" ]; then \
       echo "Found package.json, installing dependencies..." && \
       npm install $NPM_FLAGS; \
@@ -22,8 +22,8 @@ RUN if [ -f "package.json" ]; then \
       echo "Error: package.json not found in expected location" && exit 1; \
     fi
 
-# Install backend dependencies for NGINX operations
-RUN npm install express bcrypt readline
+# Install backend dependencies for NGINX operations with --legacy-peer-deps flag
+RUN npm install express bcrypt readline --legacy-peer-deps
 
 # Build the application (if there's a build script)
 RUN if grep -q "\"build\":" package.json; then \
