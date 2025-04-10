@@ -15,6 +15,12 @@ RUN chmod 666 /var/log/nginx/access.log /var/log/nginx/error.log
 # Copy configuration template
 COPY nginx.conf.template /etc/nginx/nginx.conf.template
 
+# Generate self-signed certificates for development
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/certs/server.key \
+    -out /etc/nginx/certs/server.crt \
+    -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
+
 # Create .htpasswd file for basic auth (if needed)
 RUN touch /etc/nginx/.htpasswd
 
@@ -22,5 +28,5 @@ RUN touch /etc/nginx/.htpasswd
 RUN chmod 777 /etc/nginx/
 RUN chmod 666 /etc/nginx/nginx.conf.template
 
-# Set proper write permissions on generated config
-CMD ["sh", "-c", "envsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && chmod 666 /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+# Copy nginx.conf.template to nginx.conf on startup
+CMD ["sh", "-c", "cp /etc/nginx/nginx.conf.template /etc/nginx/nginx.conf && chmod 666 /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]

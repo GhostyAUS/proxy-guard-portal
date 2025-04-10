@@ -2,9 +2,9 @@
 const express = require("express");
 const app = express();
 const PORT = process.env.API_PORT || 3001;
-const nginxService = require("./nginx-service");
 const path = require('path');
 const fs = require('fs');
+const nginxService = require("./nginx-service");
 
 app.use(express.json());
 
@@ -151,7 +151,7 @@ app.get("/api/whitelist-groups", (req, res) => {
 const updateNginxConfig = () => {
   try {
     // Generate NGINX config from whitelist groups
-    const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
+    const nginxConfigTemplate = fs.readFileSync('/etc/nginx/nginx.conf.template', 'utf8');
     console.log("Read nginx template file, generating configuration...");
     
     // Generate geo blocks for IP matching
@@ -416,7 +416,7 @@ try {
     console.log("  - PATCH /api/whitelist-groups/:id/toggle");
     console.log("  - Various /api/nginx/* endpoints");
     console.log("  - GET /api/debug/routes (lists all registered routes)");
-    console.log("Current whitelist groups:", whitelistGroups.length);
+    console.log("Current whitelist groups:", whitelistGroups?.length || 0);
   });
 } catch (error) {
   console.error("Failed to start API server:", error);

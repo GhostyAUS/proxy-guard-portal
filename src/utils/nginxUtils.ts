@@ -6,7 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
  * Generates an NGINX configuration from whitelist groups using geo directives
- * for IP matching and regex for host matching
+ * for IP matching and if statements for host matching
  */
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
   console.log(`Generating nginx config from ${groups.length} groups`);
@@ -14,7 +14,7 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   // Start with the base template
   let config = configTemplate;
   
-  // Generate geo blocks for IP matching
+  // Generate geo blocks for IP matching - one geo block per group
   const geoBlocks = groups.filter(g => g.enabled).map(group => {
     // For each group, create a geo block that maps IPs to variables
     const geoBlock = `
@@ -109,7 +109,7 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
   }
 };
 
-// Updated nginx combined proxy template with geo directives
+// Updated nginx template without map directives
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
 error_log /var/log/nginx/error.log info;
@@ -121,10 +121,10 @@ events {
 http {
     access_log /var/log/nginx/access.log;
     
-    # Define variables for access control using geo module
+    # Define variable for access control
     set $allow_access 0;
     
-    # Use geo module to match client IPs
+    # Use geo module for IP matching
 # PLACEHOLDER:GEO_BLOCKS
     
     server {
@@ -153,6 +153,7 @@ http {
         # HTTP/HTTPS proxy - handles both protocols
         location / {
             # Authentication settings (if enabled)
+            auth_basic "Proxy Authentication";
             auth_basic_user_file /etc/nginx/.htpasswd;
             
             # Handle HTTP and HTTPS traffic
