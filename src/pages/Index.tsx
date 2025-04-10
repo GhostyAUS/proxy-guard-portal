@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -14,62 +15,11 @@ import { Layout } from "@/components/layout/Layout";
 import { mockWhitelistGroups, mockNginxStatus } from "@/utils/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DashboardLogSection } from "@/components/logs/DashboardLogSection";
-import { LogEntry, LogStats } from "@/types/logs";
 
 export default function Dashboard() {
   const [whitelistGroups] = useState(mockWhitelistGroups);
   const [nginxStatus] = useState(mockNginxStatus);
   
-  const [mockLogs] = useState<LogEntry[]>([
-    {
-      id: "1",
-      timestamp: new Date().toISOString(),
-      clientIp: "192.168.1.105",
-      destination: "example.com",
-      status: "allowed",
-      method: "GET",
-      bytesTransferred: 2048,
-      responseTime: 120
-    },
-    {
-      id: "2",
-      timestamp: new Date(Date.now() - 5 * 60000).toISOString(), // 5 minutes ago
-      clientIp: "10.0.0.15",
-      destination: "api.example.org/users",
-      status: "denied",
-      method: "POST",
-      reason: "Not in whitelist"
-    },
-    {
-      id: "3",
-      timestamp: new Date(Date.now() - 15 * 60000).toISOString(), // 15 minutes ago
-      clientIp: "192.168.1.105",
-      destination: "cdn.example.net",
-      status: "allowed",
-      method: "GET",
-      bytesTransferred: 1536,
-      responseTime: 85
-    }
-  ]);
-  
-  const [mockLogStats] = useState<LogStats>({
-    totalRequests: 248,
-    allowedRequests: 203,
-    deniedRequests: 45,
-    topClients: [
-      { clientIp: "192.168.1.105", count: 87 },
-      { clientIp: "10.0.0.15", count: 42 },
-      { clientIp: "172.16.0.25", count: 28 }
-    ],
-    topDestinations: [
-      { destination: "example.com", count: 65 },
-      { destination: "api.example.org", count: 48 },
-      { destination: "cdn.example.net", count: 35 }
-    ],
-    lastUpdated: new Date().toISOString()
-  });
-
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";
   }, []);
@@ -158,7 +108,24 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        <DashboardLogSection latestLogs={mockLogs} stats={mockLogStats} />
+        <div className="mt-4">
+          <Card className="border-dashed">
+            <CardContent className="py-6">
+              <div className="flex flex-col items-center gap-3">
+                <div className="rounded-full p-3 bg-muted">
+                  <ListFilter className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-medium">View Full Log Details</h3>
+                <p className="text-sm text-center text-muted-foreground max-w-md">
+                  Access the complete access logs and detailed statistics on the logs page.
+                </p>
+                <Button asChild className="mt-2">
+                  <Link to="/logs">View Logs</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         <h2 className="text-xl font-semibold mt-6">Whitelist Groups</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
