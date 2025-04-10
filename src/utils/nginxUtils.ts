@@ -35,9 +35,8 @@ ${clientIpsMap}
 map $http_host $dest_${group.id} {
     default 0;
 ${destinationsMap}
-}
-`;
-  }).join('\n');
+}`;
+  }).join('\n\n');
   
   // Generate the access condition for the server block
   const accessConditions = groups.filter(g => g.enabled).map(group => 
@@ -48,7 +47,7 @@ ${destinationsMap}
   config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
   config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
   
-  console.log(`Generated nginx config with ${mapBlocks.length} map blocks`);
+  console.log(`Generated nginx config with ${groups.filter(g => g.enabled).length} enabled groups`);
   return config;
 };
 

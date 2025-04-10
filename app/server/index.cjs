@@ -134,13 +134,13 @@ const whitelistGroups = [
   }
 ];
 
-// GET endpoint for whitelist groups - FIXED: change path to match what frontend is expecting
+// GET endpoint for whitelist groups
 app.get("/api/whitelist-groups", (req, res) => {
   console.log("Whitelist groups requested - returning:", whitelistGroups.length, "groups");
   
   // Log the structure of what we're returning
   console.log("Response structure:", JSON.stringify({
-    groups: whitelistGroups.map(g => ({ id: g.id, name: g.name })) // Log just id and name to keep logs manageable
+    groups: whitelistGroups.map(g => ({ id: g.id, name: g.name }))
   }, null, 2));
   
   // IMPORTANT: Return proper JSON structure with groups array
@@ -176,9 +176,8 @@ ${clientIpsMap}
 map $http_host $dest_${group.id} {
     default 0;
 ${destinationsMap}
-}
-`;
-    }).join('\n');
+}`;
+    }).join('\n\n');
     
     // Generate the access condition for the server block
     const accessConditions = whitelistGroups.filter(g => g.enabled).map(group => 
@@ -193,6 +192,11 @@ ${destinationsMap}
     console.log("Generated NGINX config with:");
     console.log(`- ${whitelistGroups.filter(g => g.enabled).length} enabled groups`);
     console.log(`- ${accessConditions.split('\n').length} access conditions`);
+    
+    // Log the first few lines of the generated config for debugging
+    const configLines = config.split('\n');
+    console.log("First 20 lines of generated config:");
+    configLines.slice(0, 20).forEach((line, i) => console.log(`Line ${i+1}: ${line}`));
     
     return config;
   } catch (err) {

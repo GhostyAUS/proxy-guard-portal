@@ -17,7 +17,7 @@ http {
 # PLACEHOLDER:MAP_BLOCKS
     
     server {
-        listen 80 ssl http2;
+        listen 80;
         
         # SSL configuration for HTTPS
         ssl_certificate /etc/nginx/certs/server.crt;
