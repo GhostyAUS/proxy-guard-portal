@@ -11,7 +11,9 @@ services:
     environment:
       - NGINX_CONFIG_PATH=/etc/nginx/nginx.conf
       - API_BASE_URL=http://localhost:3001
+      - VITE_API_BASE_URL=http://localhost:3001
       - API_PORT=3001
+      - VITE_API_PORT=3001
       - AUTH_TYPE=${AUTH_TYPE:-none}
       - LDAP_SERVER=${LDAP_SERVER:-}
       - LDAP_PORT=${LDAP_PORT:-389}

@@ -17,7 +17,8 @@ import { LogsProvider } from "./contexts/LogsContext";
 import { WhitelistGroupsProvider } from "./hooks/useWhitelistGroups";
 
 // Set up API base URL from environment variables
-if (!process.env.API_BASE_URL) {
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+if (!API_BASE_URL) {
   console.warn("API_BASE_URL is not set. Using default /api path.");
 }
 

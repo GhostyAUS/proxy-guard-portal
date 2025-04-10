@@ -3,7 +3,7 @@ import { WhitelistGroup } from "@/types/proxy";
 import axios from "axios";
 
 // API endpoint for nginx operations
-const API_BASE_URL = process.env.API_BASE_URL || "/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
  * Generates an NGINX configuration from whitelist groups
