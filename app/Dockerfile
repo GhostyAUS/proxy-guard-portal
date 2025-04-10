@@ -58,20 +58,22 @@ COPY --from=build /app/src/server ./server 2>/dev/null || echo "Server directory
 # Create a minimal server file if it doesn't exist
 RUN mkdir -p /app/server
 RUN if [ ! -f "/app/server/index.js" ]; then \
-      echo 'console.log("Creating minimal API server");'\
-'const express = require("express");'\
-'const app = express();'\
-'const PORT = process.env.API_PORT || 3001;'\
-''\
-'app.use(express.json());'\
-''\
-'app.get("/api/health", (req, res) => {'\
-'  res.json({ status: "ok", timestamp: new Date() });'\
-'});'\
-''\
-'app.listen(PORT, () => {'\
-'  console.log(`API Server running on port ${PORT}`);'\
-'});' > /app/server/index.js; \
+      cat > /app/server/index.js << 'EOF'
+console.log("Creating minimal API server");
+const express = require("express");
+const app = express();
+const PORT = process.env.API_PORT || 3001;
+
+app.use(express.json());
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date() });
+});
+
+app.listen(PORT, () => {
+  console.log(`API Server running on port ${PORT}`);
+});
+EOF
     fi
 
 # Create a minimal start script if it doesn't exist
@@ -94,19 +96,21 @@ RUN echo "Checking package.json for start script:" && \
 RUN echo "Final package.json content:" && cat package.json
 
 # Create the start.sh script with better error handling
-RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Start the backend API server if it exists' >> /app/start.sh && \
-    echo 'if [ -f "/app/server/index.js" ]; then' >> /app/start.sh && \
-    echo '  echo "Starting API server..."' >> /app/start.sh && \
-    echo '  node /app/server/index.js &' >> /app/start.sh && \
-    echo 'else' >> /app/start.sh && \
-    echo '  echo "WARNING: API server file not found, skipping backend startup"' >> /app/start.sh && \
-    echo 'fi' >> /app/start.sh && \
-    echo '' >> /app/start.sh && \
-    echo '# Start the frontend' >> /app/start.sh && \
-    echo 'echo "Starting frontend..."' >> /app/start.sh && \
-    echo 'npm start' >> /app/start.sh
+RUN cat > /app/start.sh << 'EOF'
+#!/bin/sh
+
+# Start the backend API server if it exists
+if [ -f "/app/server/index.js" ]; then
+  echo "Starting API server..."
+  node /app/server/index.js &
+else
+  echo "WARNING: API server file not found, skipping backend startup"
+fi
+
+# Start the frontend
+echo "Starting frontend..."
+npm start
+EOF
 
 # Ensure the script exists and is executable
 RUN chmod +x /app/start.sh
