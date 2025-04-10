@@ -13,14 +13,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NginxStatus } from "@/types/proxy";
 
 export default function HttpProxy() {
-  const { data: whitelistGroups, isLoading: isLoadingGroups } = useWhitelistGroups();
+  const { groups, isLoading: isLoadingGroups } = useWhitelistGroups();
   const { data: nginxStatus, isLoading: isLoadingStatus } = useNginxStatus();
   
   useEffect(() => {
     document.title = "HTTP Proxy | Proxy Guard";
   }, []);
   
-  const activeGroups = whitelistGroups?.filter(group => group.enabled) || [];
+  const activeGroups = groups?.filter(group => group.enabled) || [];
 
   return (
     <Layout>
