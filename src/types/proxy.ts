@@ -20,58 +20,13 @@ export interface WhitelistGroup {
   enabled: boolean;
 }
 
-export interface ProxySettings {
-  nginxConfigPath?: string;
-  isReadOnly?: boolean;
-  proxyPort?: string; // Combined HTTP/HTTPS port
-  httpPort?: string; // HTTP port
-  httpsPort?: string; // HTTPS port
-  maxUploadSize?: string; // Maximum upload size
-  sslCertPath?: string; // Path to SSL certificate
-  authType?: 'none' | 'ldap' | 'saml';
-  ldapSettings?: {
-    serverUrl: string;
-    bindDn: string;
-    searchBase: string;
-    searchFilter: string;
-    useLdaps?: boolean;
-    ldapPort?: string;
-  };
-  samlSettings?: {
-    entityId: string;
-    assertionConsumerService: string;
-    idpMetadataUrl: string;
-  };
-  clientAuth?: {
-    requireAuth: boolean;
-    authMethod: 'none' | 'ldap' | 'basic';
-    realm?: string;
-    ldapUrl?: string;
-    ldapBindDn?: string;
-    ldapSearchBase?: string;
-    ldapSearchFilter?: string;
-    ldapPort?: string;
-    useLdaps?: boolean;
-  };
-  logsSettings?: {
-    accessLogPath: string;
-    errorLogPath: string;
-    logLevel: 'debug' | 'info' | 'notice' | 'warn' | 'error' | 'crit' | 'alert' | 'emerg';
-    logFormat?: string;
-    rotateLogsDaily: boolean;
-    compressLogs: boolean;
-    maxLogFiles: string;
-  };
-}
-
 export interface NginxStatus {
   isRunning: boolean;
-  version?: string; // NGINX version
+  version?: string;
   lastConfigTest: {
     success: boolean;
     message: string;
   };
   lastModified: string;
   configWritable: boolean;
-  configExists?: boolean; // Added this property
 }

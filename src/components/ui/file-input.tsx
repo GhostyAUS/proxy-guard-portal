@@ -1,130 +1,141 @@
 
-import * as React from "react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { X } from "lucide-react"
+import React, { useState, useRef } from 'react';
+import { Button } from './button';
+import { Input } from './input';
+import { X, Upload, FileText, Image, File as FileIcon } from 'lucide-react';
 
-interface FileInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  onFileChange?: (files: File[]) => void
-  showSelectedFiles?: boolean
-  maxFiles?: number
-  acceptedFileTypes?: string
+interface FileInputProps {
+  onFileChange: (files: File[]) => void;
+  maxFiles?: number;
+  acceptedFileTypes?: string;
+  initialFiles?: File[];
 }
 
-const FileInput = React.forwardRef<HTMLInputElement, FileInputProps>(
-  ({ className, onFileChange, showSelectedFiles = true, maxFiles, acceptedFileTypes, ...props }, ref) => {
-    const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
-    const fileInputRef = React.useRef<HTMLInputElement>(null)
+export function FileInput({
+  onFileChange,
+  maxFiles = 10,
+  acceptedFileTypes,
+  initialFiles = []
+}: FileInputProps) {
+  const [files, setFiles] = useState<File[]>(initialFiles);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || [])
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    
+    const newFiles = Array.from(e.target.files);
+    const updatedFiles = [...files, ...newFiles].slice(0, maxFiles);
+    
+    setFiles(updatedFiles);
+    onFileChange(updatedFiles);
+    
+    // Reset input value so the same file can be uploaded again if removed
+    e.target.value = '';
+  };
+
+  const handleRemoveFile = (indexToRemove: number) => {
+    const updatedFiles = files.filter((_, index) => index !== indexToRemove);
+    setFiles(updatedFiles);
+    onFileChange(updatedFiles);
+  };
+
+  const handleBrowseClick = () => {
+    inputRef.current?.click();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    
+    if (e.dataTransfer.files?.length) {
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      const updatedFiles = [...files, ...droppedFiles].slice(0, maxFiles);
       
-      if (maxFiles && selectedFiles.length + files.length > maxFiles) {
-        console.warn(`Maximum number of files (${maxFiles}) exceeded`)
-        return
-      }
-      
-      setSelectedFiles(prev => [...prev, ...files])
-      if (onFileChange) {
-        onFileChange([...selectedFiles, ...files])
-      }
-      
-      // Reset the input value so the same file can be selected again if needed
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      setFiles(updatedFiles);
+      onFileChange(updatedFiles);
     }
+  };
 
-    const handleRemoveFile = (fileToRemove: File) => {
-      const updatedFiles = selectedFiles.filter(file => file !== fileToRemove)
-      setSelectedFiles(updatedFiles)
-      if (onFileChange) {
-        onFileChange(updatedFiles)
-      }
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      return <Image className="h-6 w-6 text-blue-500" />;
+    } else if (file.type.includes('pdf')) {
+      return <FileText className="h-6 w-6 text-red-500" />;
+    } else if (file.type.includes('word') || file.type.includes('document')) {
+      return <FileText className="h-6 w-6 text-blue-500" />;
+    } else if (file.type.includes('spreadsheet') || file.type.includes('excel')) {
+      return <FileText className="h-6 w-6 text-green-500" />;
+    } else {
+      return <FileIcon className="h-6 w-6 text-gray-500" />;
     }
+  };
 
-    const clearFiles = () => {
-      setSelectedFiles([])
-      if (onFileChange) {
-        onFileChange([])
-      }
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-
-    return (
-      <div className={cn("space-y-2", className)}>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-sm"
-          >
-            Select Files
-          </Button>
-          {selectedFiles.length > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={clearFiles}
-              className="h-8 text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear all
-            </Button>
-          )}
-        </div>
-        <input
+  return (
+    <div className="space-y-4">
+      <div 
+        className="border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      >
+        <Upload className="h-10 w-10 text-muted-foreground mb-2" />
+        <p className="text-sm font-medium mb-1">Drag and drop files here</p>
+        <p className="text-xs text-muted-foreground mb-4">or</p>
+        
+        <Button type="button" onClick={handleBrowseClick} variant="outline">
+          Browse Files
+        </Button>
+        
+        <Input
           type="file"
-          className="hidden"
-          ref={(e) => {
-            // Handle both the forwarded ref and our local ref
-            if (typeof ref === 'function') {
-              ref(e)
-            } else if (ref) {
-              ref.current = e
-            }
-            fileInputRef.current = e
-          }}
+          ref={inputRef}
           onChange={handleFileChange}
-          multiple={maxFiles !== 1}
+          className="hidden"
+          multiple={maxFiles > 1}
           accept={acceptedFileTypes}
-          {...props}
+          aria-label="File upload"
         />
-        {showSelectedFiles && selectedFiles.length > 0 && (
-          <div className="mt-2 space-y-1">
-            {selectedFiles.map((file, index) => (
-              <div 
-                key={`${file.name}-${index}`} 
-                className="flex items-center justify-between rounded border border-border bg-muted/30 px-3 py-2"
-              >
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium truncate max-w-[200px]">{file.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {(file.size / 1024).toFixed(1)} KB
-                  </span>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemoveFile(file)}
-                  className="h-8 w-8"
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Remove file</span>
-                </Button>
-              </div>
-            ))}
-          </div>
+        
+        {maxFiles && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Maximum {maxFiles} file{maxFiles !== 1 ? 's' : ''}
+            {acceptedFileTypes && ` (${acceptedFileTypes})`}
+          </p>
         )}
       </div>
-    )
-  }
-)
 
-FileInput.displayName = "FileInput"
-
-export { FileInput }
+      {files.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Selected Files ({files.length}/{maxFiles})</p>
+          <ul className="divide-y">
+            {files.map((file, index) => (
+              <li key={`${file.name}-${index}`} className="flex items-center justify-between py-2">
+                <div className="flex items-center">
+                  {getFileIcon(file)}
+                  <div className="ml-2">
+                    <p className="text-sm font-medium truncate max-w-[180px] sm:max-w-xs">
+                      {file.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRemoveFile(index)}
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

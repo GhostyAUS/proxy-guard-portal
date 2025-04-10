@@ -1,163 +1,50 @@
 
-import axios from 'axios';
-import { WhitelistGroup, ProxySettings, NginxStatus } from '@/types/proxy';
+import axios from "axios";
+import { WhitelistGroup } from "@/types/proxy";
 
-// Set up API base URL from environment variables
+// API base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+
+// API client
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
-// Add request interceptor for debugging
-api.interceptors.request.use(
-  (config) => {
-    console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    return config;
-  },
-  (error) => {
-    console.error('API Request Error:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Add response interceptor for debugging
-api.interceptors.response.use(
-  (response) => {
-    console.log(`API Response from ${response.config.url}: Status ${response.status}`);
-    return response;
-  },
-  (error) => {
-    console.error('API Response Error:', error);
-    if (error.response) {
-      console.error('Error Status:', error.response.status);
-      console.error('Error Data:', error.response.data);
-    }
-    return Promise.reject(error);
-  }
-);
-
-export async function fetchWhitelistGroups(): Promise<WhitelistGroup[]> {
+// Fetch whitelist groups
+export const fetchWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
   try {
-    const response = await api.get('/whitelist/groups');
-    console.log("API response for whitelist groups:", response.data);
-    
-    // Handle both array response and { groups: [...] } structure
-    if (Array.isArray(response.data)) {
-      return response.data;
-    } else if (response.data && Array.isArray(response.data.groups)) {
-      return response.data.groups;
-    }
-    // If neither format is valid, return empty array
-    console.warn('Unexpected response format from API:', response.data);
-    return [];
-  } catch (error) {
-    console.error('Error fetching whitelist groups:', error);
-    // Return empty array instead of throwing to prevent UI crashes
-    return [];
-  }
-}
-
-export async function updateWhitelistGroups(groups: WhitelistGroup[]): Promise<boolean> {
-  try {
-    const response = await api.post('/whitelist/groups', { groups });
-    return response.data.success === true;
-  } catch (error) {
-    console.error('Error updating whitelist groups:', error);
-    throw new Error('Failed to update whitelist groups');
-  }
-}
-
-export async function fetchNginxStatus(): Promise<NginxStatus> {
-  try {
-    console.log("Fetching nginx status from:", `${API_BASE_URL}/nginx/status`);
-    const response = await api.get('/nginx/status');
-    console.log("Nginx status response:", response.data);
+    const response = await api.get("/whitelist/groups");
     return response.data;
   } catch (error) {
-    console.error('Error fetching Nginx status:', error);
-    // Return default status with isRunning: false instead of throwing
-    return {
-      isRunning: false,
-      lastModified: new Date().toISOString(),
-      lastConfigTest: {
-        success: false,
-        message: 'Failed to fetch status'
-      },
-      configWritable: false,
-      configExists: false
-    };
+    console.error("Error fetching whitelist groups:", error);
+    throw error;
   }
-}
+};
 
-export async function fetchNginxConfig(): Promise<{config: string, isTemplate?: boolean}> {
-  try {
-    const response = await api.get('/nginx/config');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching nginx config:', error);
-    return { config: '', isTemplate: false };
-  }
-}
+// Create whitelist group
+export const createWhitelistGroup = async (group: Omit<WhitelistGroup, "id">): Promise<WhitelistGroup> => {
+  const response = await api.post("/whitelist/groups", group);
+  return response.data;
+};
 
-export async function saveNginxConfig(config: string): Promise<boolean> {
-  try {
-    const response = await api.post('/nginx/save', { config });
-    return response.data.success === true;
-  } catch (error) {
-    console.error('Error saving nginx config:', error);
-    throw new Error('Failed to save nginx configuration');
-  }
-}
+// Update whitelist group
+export const updateWhitelistGroup = async (group: WhitelistGroup): Promise<WhitelistGroup> => {
+  const response = await api.put(`/whitelist/groups/${group.id}`, group);
+  return response.data;
+};
 
-export async function reloadNginxConfig(): Promise<boolean> {
-  try {
-    const response = await api.post('/nginx/reload');
-    return response.data.success === true;
-  } catch (error) {
-    console.error('Error reloading nginx:', error);
-    throw new Error('Failed to reload nginx configuration');
-  }
-}
+// Delete whitelist group
+export const deleteWhitelistGroup = async (id: string): Promise<void> => {
+  await api.delete(`/whitelist/groups/${id}`);
+};
 
-export async function fetchProxySettings(): Promise<ProxySettings> {
-  try {
-    const response = await api.get('/settings/proxy');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching proxy settings:', error);
-    // Return default settings instead of throwing
-    return {
-      httpPort: "8080",
-      httpsPort: "8443",
-      maxUploadSize: "10m",
-      sslCertPath: "/etc/nginx/certs/server.crt"
-    };
-  }
-}
-
-export async function fetchApiRoutes() {
-  try {
-    console.log("Fetching API routes from:", `${API_BASE_URL}/debug/routes`);
-    const response = await api.get('/debug/routes');
-    console.log("API routes response:", response.data);
-    return response.data.routes || [];
-  } catch (error) {
-    console.error('Error fetching API routes:', error);
-    return [];
-  }
-}
-
-export async function generateHtpasswd(users: {username: string, password: string}[]): Promise<boolean> {
-  try {
-    const response = await api.post('/nginx/htpasswd', { users });
-    return response.data.success === true;
-  } catch (error) {
-    console.error('Error generating htpasswd file:', error);
-    throw new Error('Failed to generate htpasswd file');
-  }
-}
+// Apply configuration
+export const applyConfiguration = async (): Promise<boolean> => {
+  const response = await api.post("/whitelist/apply");
+  return response.data.success === true;
+};
 
 export default api;

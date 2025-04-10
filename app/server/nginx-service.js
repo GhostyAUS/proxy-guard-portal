@@ -1,3 +1,4 @@
+
 /**
  * NGINX operations service for the Proxy Guard application
  */
@@ -5,8 +6,6 @@ const express = require('express');
 const fs = require('fs');
 const { exec } = require('child_process');
 const path = require('path');
-const bcrypt = require('bcrypt');
-const readline = require('readline');
 
 const router = express.Router();
 
@@ -123,7 +122,7 @@ router.get('/config', (req, res) => {
 // Validate NGINX config syntax
 router.post('/validate', async (req, res) => {
   try {
-    const { config, configPath } = req.body;
+    const { config } = req.body;
     
     // Write config to a temp file
     const tempFile = `/tmp/nginx-test-${Date.now()}.conf`;
@@ -158,7 +157,7 @@ router.post('/validate', async (req, res) => {
 router.post('/save', async (req, res) => {
   try {
     const { config } = req.body;
-    const configPath = req.body.configPath || '/etc/nginx/nginx.conf';
+    const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
     
     console.log(`Saving NGINX config to ${configPath}`);
     
@@ -177,63 +176,20 @@ router.post('/save', async (req, res) => {
     }
     
     // Write new config
-    try {
-      fs.writeFileSync(configPath, config);
-      console.log('NGINX config saved successfully');
-      
-      res.json({ success: true });
-    } catch (writeError) {
-      console.error('Error writing config file:', writeError);
-      res.status(500).json({ 
-        success: false, 
-        error: `Failed to write config: ${writeError.message}` 
-      });
-    }
+    fs.writeFileSync(configPath, config);
+    console.log('NGINX config saved successfully');
+    
+    res.json({ success: true });
   } catch (error) {
     console.error('Error saving nginx config:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Test if config path is writable
-router.post('/test-writable', (req, res) => {
+// Restart NGINX
+router.post('/restart', async (req, res) => {
   try {
-    const configPath = req.body.configPath || '/etc/nginx/nginx.conf';
-    
-    // Test if directory is writable
-    const configDir = path.dirname(configPath);
-    
-    // Check if directory exists
-    if (!fs.existsSync(configDir)) {
-      return res.json({ 
-        writable: false, 
-        error: `Directory ${configDir} does not exist` 
-      });
-    }
-    
-    // Try to write to a temp file in that directory
-    const testFile = path.join(configDir, `.test-${Date.now()}`);
-    
-    try {
-      fs.writeFileSync(testFile, 'test');
-      fs.unlinkSync(testFile);
-      res.json({ writable: true });
-    } catch (writeError) {
-      res.json({ 
-        writable: false, 
-        error: `Cannot write to ${configDir}: ${writeError.message}` 
-      });
-    }
-  } catch (error) {
-    console.error('Error testing if config is writable:', error);
-    res.status(500).json({ writable: false, error: error.message });
-  }
-});
-
-// Reload NGINX
-router.post('/reload', async (req, res) => {
-  try {
-    console.log('Attempting to reload NGINX configuration...');
+    console.log('Attempting to restart NGINX...');
     
     // Execute nginx reload command
     try {
@@ -242,336 +198,154 @@ router.post('/reload', async (req, res) => {
       res.json({ success: true });
     } catch (execError) {
       console.error('Error executing nginx reload command:', execError);
-      res.status(500).json({ 
-        success: false, 
-        error: execError.stderr || 'Failed to reload NGINX'
-      });
-    }
-  } catch (error) {
-    console.error('Error reloading nginx:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Generate htpasswd file
-router.post('/htpasswd', async (req, res) => {
-  try {
-    const { users } = req.body;
-    const htpasswdPath = '/etc/nginx/.htpasswd';
-    
-    let htpasswdContent = '';
-    
-    // Generate htpasswd entries
-    for (const user of users) {
-      const salt = await bcrypt.genSalt(10);
-      const hash = await bcrypt.hash(user.password, salt);
-      htpasswdContent += `${user.username}:${hash}\n`;
-    }
-    
-    // Write htpasswd file
-    fs.writeFileSync(htpasswdPath, htpasswdContent);
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error generating htpasswd file:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Parse nginx access logs and return structured data
-router.get('/logs', (req, res) => {
-  try {
-    const logPath = '/var/log/nginx/access.log';
-    const errorLogPath = '/var/log/nginx/error.log';
-    const logs = [];
-    const stats = {
-      totalRequests: 0,
-      allowedRequests: 0,
-      deniedRequests: 0,
-      topClients: [],
-      topDestinations: [],
-      lastUpdated: new Date().toISOString()
-    };
-    
-    const clientCounts = {};
-    const destinationCounts = {};
-
-    // Check if log file exists
-    if (!fs.existsSync(logPath)) {
-      return res.json({ logs: [], stats });
-    }
-
-    // Stream the file line by line for better performance with large logs
-    const fileStream = fs.createReadStream(logPath);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity
-    });
-
-    const processLogLine = (line) => {
-      // Example log format: 192.168.1.1 - - [10/Apr/2023:12:34:56 +0000] "GET https://example.com/ HTTP/1.1" 200 1234 "-" "Mozilla/5.0"
-      const ipMatch = line.match(/^(\S+)/);
-      const timeMatch = line.match(/\[([^\]]+)\]/);
-      const requestMatch = line.match(/"([^"]+)"/);
-      const statusMatch = line.match(/" (\d{3}) (\d+)/);
       
-      if (ipMatch && timeMatch && requestMatch && statusMatch) {
-        const clientIp = ipMatch[1];
-        const timestamp = new Date(timeMatch[1].replace(':', ' ')).toISOString();
-        const request = requestMatch[1].split(' ');
-        const method = request[0];
-        const destination = request[1].replace(/^https?:\/\//, '').split('/')[0];
-        const status = parseInt(statusMatch[1], 10);
-        const bytesTransferred = parseInt(statusMatch[2], 10);
-        
-        // Determine if request was allowed or denied
-        const allowed = status < 400;
-        
-        // Update statistics
-        stats.totalRequests++;
-        if (allowed) {
-          stats.allowedRequests++;
-        } else {
-          stats.deniedRequests++;
-        }
-        
-        // Track client and destination counts for top lists
-        if (!clientCounts[clientIp]) clientCounts[clientIp] = 0;
-        clientCounts[clientIp]++;
-        
-        if (!destinationCounts[destination]) destinationCounts[destination] = 0;
-        destinationCounts[destination]++;
-        
-        // Add to logs array
-        logs.push({
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp,
-          clientIp,
-          destination,
-          status: allowed ? 'allowed' : 'denied',
-          reason: allowed ? undefined : `HTTP Status ${status}`,
-          bytesTransferred,
-          method,
-          responseTime: Math.floor(Math.random() * 1000) // Response time not typically available in logs
+      // Try full restart if reload fails
+      try {
+        await execPromise('nginx -s quit && nginx');
+        console.log('NGINX full restart successful');
+        res.json({ success: true });
+      } catch (restartError) {
+        console.error('Error executing full restart:', restartError);
+        res.status(500).json({ 
+          success: false, 
+          error: restartError.stderr || 'Failed to restart NGINX'
         });
       }
-    };
-
-    // Process the log file
-    rl.on('line', processLogLine);
-    
-    rl.on('close', () => {
-      // Create top clients and destinations arrays
-      stats.topClients = Object.entries(clientCounts)
-        .map(([clientIp, count]) => ({ clientIp, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-      
-      stats.topDestinations = Object.entries(destinationCounts)
-        .map(([destination, count]) => ({ destination, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-      
-      // Sort logs by timestamp (newest first)
-      logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      
-      res.json({
-        logs: logs.slice(0, 100), // Return only the latest 100 logs
-        stats
-      });
-    });
+    }
   } catch (error) {
-    console.error('Error reading access logs:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error restarting nginx:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Get whitelist groups from NGINX config
+// Extract whitelist groups from NGINX config
 router.get('/whitelist-groups', (req, res) => {
   try {
     console.log('Getting whitelist groups from nginx config');
     const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
     
     if (!fs.existsSync(configPath)) {
-      const templatePath = '/etc/nginx/nginx.conf.template';
-      
-      if (fs.existsSync(templatePath)) {
-        const config = fs.readFileSync(templatePath, 'utf8');
-        const groups = extractWhitelistGroups(config);
-        return res.json({ groups });
-      }
-      
-      return res.json({ groups: [] });
+      return res.json([]);
     }
     
     const config = fs.readFileSync(configPath, 'utf8');
-    const groups = extractWhitelistGroups(config);
+    const groups = parseWhitelistGroups(config);
     
-    res.json({ groups });
+    res.json(groups);
   } catch (error) {
-    console.error('Error getting whitelist groups:', error);
+    console.error('Error extracting whitelist groups:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Debug endpoint to get available routes
-router.get('/debug/routes', (req, res) => {
-  try {
-    // Get all registered routes
-    const routes = [];
-    
-    // Walk through all layers recursively
-    function extractRoutes(stack, basePath = '') {
-      for (const layer of stack) {
-        if (layer.route) {
-          // Routes registered directly on the router
-          const methods = Object.keys(layer.route.methods)
-            .filter(method => layer.route.methods[method])
-            .map(method => method.toUpperCase());
-            
-          routes.push(`${methods.join(',')} ${basePath}${layer.route.path}`);
-        } else if (layer.name === 'router' && layer.handle.stack) {
-          // Nested routers
-          const path = layer.regexp.source.replace('^\\/','').replace('(?=\\/|$)', '').replace(/\\\//g, '/');
-          extractRoutes(layer.handle.stack, basePath + '/' + path);
-        }
+// Parse whitelist groups from NGINX config
+function parseWhitelistGroups(config) {
+  const groups = [];
+  
+  // Extract IP whitelist section
+  const ipWhitelistMatch = config.match(/geo \$whitelist \{([\s\S]*?)\}/);
+  const ipWhitelistText = ipWhitelistMatch ? ipWhitelistMatch[1] : '';
+  
+  // Extract URL whitelist section
+  const urlWhitelistMatch = config.match(/map \$host \$is_allowed_url \{([\s\S]*?)\}/);
+  const urlWhitelistText = urlWhitelistMatch ? urlWhitelistMatch[1] : '';
+  
+  // Process IP entries
+  const ipEntries = {};
+  const ipComments = {};
+  let currentComment = '';
+  
+  ipWhitelistText.split('\n').forEach(line => {
+    line = line.trim();
+    if (line.startsWith('#')) {
+      // Extract group name from comment if it exists
+      if (line.includes('Group:')) {
+        currentComment = line;
+      } else if (currentComment && line.startsWith('#')) {
+        // This is a description for a group
+        currentComment += ' ' + line.replace('#', '').trim();
       }
-    }
-    
-    // Get routes from the router itself
-    if (router.stack) {
-      extractRoutes(router.stack);
-    }
-    
-    // Get routes from the parent app if available
-    if (req.app && req.app._router && req.app._router.stack) {
-      extractRoutes(req.app._router.stack);
-    }
-    
-    res.json({ 
-      routes, 
-      baseUrl: process.env.API_BASE_URL || '/api',
-      configPath: process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf'
-    });
-  } catch (error) {
-    console.error('Error getting api routes:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Health check endpoint
-router.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    environment: {
-      NGINX_CONFIG_PATH: process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf',
-      API_BASE_URL: process.env.API_BASE_URL || '/api'
+    } else if (line && !line.startsWith('default')) {
+      // Extract IP and optional comment
+      const parts = line.split('#');
+      const ipParts = parts[0].trim().split(/\s+/);
+      if (ipParts.length >= 2) {
+        const ip = ipParts[0];
+        const groupName = currentComment.includes('Group:') ? 
+          currentComment.split('Group:')[1].trim() : 'Default Group';
+        
+        if (!ipEntries[groupName]) {
+          ipEntries[groupName] = [];
+          ipComments[groupName] = currentComment;
+        }
+        
+        ipEntries[groupName].push({
+          value: ip,
+          description: parts[1] ? parts[1].trim() : ''
+        });
+      }
     }
   });
-});
-
-// Helper function to extract whitelist groups from NGINX config
-function extractWhitelistGroups(config) {
-  const groups = [];
-  let currentGroup = null;
   
-  // Extract group comments and maps
-  const lines = config.split('\n');
+  // Process URL entries
+  const urlEntries = {};
+  currentComment = '';
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Check for group comment
-    if (line.startsWith('# Group:')) {
-      const name = line.replace('# Group:', '').trim();
-      currentGroup = {
-        id: `group-${Date.now()}-${groups.length}`,
-        name,
-        description: '',
-        clients: [],
-        destinations: [],
-        enabled: true
-      };
-    }
-    
-    // Check for client IPs map
-    if (line.startsWith('map $remote_addr $client_') && currentGroup) {
-      const clientMapLines = getMapBlock(lines, i);
-      
-      // Extract client IPs
-      for (const mapLine of clientMapLines) {
-        const trimmedLine = mapLine.trim();
-        if (trimmedLine && !trimmedLine.startsWith('default') && trimmedLine.includes('1;')) {
-          const ipValue = trimmedLine.split(' ')[0];
-          currentGroup.clients.push({
-            id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            value: ipValue,
-            description: ''
-          });
-        }
+  urlWhitelistText.split('\n').forEach(line => {
+    line = line.trim();
+    if (line.startsWith('#')) {
+      // Extract group name from comment if it exists
+      if (line.includes('Group:')) {
+        currentComment = line;
       }
-      
-      // Skip processed lines
-      i += clientMapLines.length;
-    }
-    
-    // Check for destinations map
-    if (line.startsWith('map $http_host $dest_') && currentGroup) {
-      const destMapLines = getMapBlock(lines, i);
-      
-      // Extract destinations
-      for (const mapLine of destMapLines) {
-        const trimmedLine = mapLine.trim();
-        if (trimmedLine && !trimmedLine.startsWith('default') && trimmedLine.includes('1;')) {
-          const destValue = trimmedLine.split(' ')[0];
-          currentGroup.destinations.push({
-            id: `dest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            value: destValue,
-            description: ''
-          });
+    } else if (line && !line.startsWith('default')) {
+      // Extract URL and optional comment
+      const parts = line.split('#');
+      const urlParts = parts[0].trim().split(/\s+/);
+      if (urlParts.length >= 2) {
+        let url = urlParts[0].replace(/"/g, '').replace(/~\^.*\\\./, '').replace(/\$/, '');
+        // Clean up regex patterns
+        url = url.replace(/\\\./g, '.');
+        
+        const groupName = currentComment.includes('Group:') ? 
+          currentComment.split('Group:')[1].trim() : 'Default Group';
+        
+        if (!urlEntries[groupName]) {
+          urlEntries[groupName] = [];
         }
+        
+        urlEntries[groupName].push({
+          value: url,
+          description: parts[1] ? parts[1].trim() : ''
+        });
       }
-      
-      // Add group to list and reset current group
-      groups.push(currentGroup);
-      currentGroup = null;
-      
-      // Skip processed lines
-      i += destMapLines.length;
     }
-  }
+  });
+  
+  // Create groups from collected entries
+  const groupNames = new Set([...Object.keys(ipEntries), ...Object.keys(urlEntries)]);
+  
+  groupNames.forEach(name => {
+    const id = `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const description = ipComments[name] || '';
+    
+    groups.push({
+      id,
+      name,
+      description: description.replace(/# Group: [^\n]+/, '').trim(),
+      clients: (ipEntries[name] || []).map((ip, idx) => ({
+        id: `ip-${id}-${idx}`,
+        ...ip
+      })),
+      destinations: (urlEntries[name] || []).map((url, idx) => ({
+        id: `url-${id}-${idx}`,
+        ...url
+      })),
+      enabled: true
+    });
+  });
   
   return groups;
-}
-
-// Helper function to get all lines in a map block
-function getMapBlock(lines, startIndex) {
-  const mapLines = [];
-  let bracesCount = 0;
-  let index = startIndex;
-  
-  // Find opening brace
-  while (index < lines.length && !lines[index].includes('{')) {
-    index++;
-  }
-  
-  // Process block content
-  while (index < lines.length) {
-    const line = lines[index];
-    mapLines.push(line);
-    
-    if (line.includes('{')) bracesCount++;
-    if (line.includes('}')) bracesCount--;
-    
-    if (bracesCount === 0 && mapLines.length > 1) {
-      break;
-    }
-    
-    index++;
-  }
-  
-  return mapLines;
 }
 
 module.exports = router;

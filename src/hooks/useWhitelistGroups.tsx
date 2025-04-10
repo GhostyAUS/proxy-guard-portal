@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useCallback, useState, useEffect, ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { fetchWhitelistGroups } from '@/services/apiService';
 import { WhitelistGroup, ClientIP, Destination } from '@/types/proxy';
 import axios from 'axios';
@@ -29,7 +30,6 @@ const WhitelistGroupsContext = createContext<WhitelistGroupsContextType | undefi
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
-  const queryClient = useQueryClient();
   const [groups, setGroups] = useState<WhitelistGroup[]>([]);
   
   const { data, isLoading, error, refetch: tanstackRefetch } = useQuery<WhitelistGroup[]>({
@@ -39,15 +39,7 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (data && Array.isArray(data)) {
-      const safeData = data.map(group => ({
-        ...group,
-        name: group.name || "",
-        description: group.description || "",
-        clients: Array.isArray(group.clients) ? group.clients : [],
-        destinations: Array.isArray(group.destinations) ? group.destinations : [],
-        enabled: typeof group.enabled === 'boolean' ? group.enabled : false
-      }));
-      setGroups(safeData);
+      setGroups(data);
     }
   }, [data]);
 
@@ -79,31 +71,10 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
 
   const addGroup = useCallback(async (group: Omit<WhitelistGroup, "id">) => {
     try {
-      console.log("Adding group:", group);
-      const safeGroup = {
-        ...group,
-        name: group.name || "",
-        description: group.description || "",
-        clients: Array.isArray(group.clients) ? group.clients : [],
-        destinations: Array.isArray(group.destinations) ? group.destinations : [],
-        enabled: typeof group.enabled === 'boolean' ? group.enabled : false
-      };
-      
-      const response = await axios.post(`${API_BASE_URL}/whitelist/groups`, safeGroup);
+      const response = await axios.post(`${API_BASE_URL}/whitelist/groups`, group);
       const newGroup = response.data;
-      
-      const safeNewGroup = {
-        ...newGroup,
-        name: newGroup.name || "",
-        description: newGroup.description || "",
-        clients: Array.isArray(newGroup.clients) ? newGroup.clients : [],
-        destinations: Array.isArray(newGroup.destinations) ? newGroup.destinations : [],
-        enabled: typeof newGroup.enabled === 'boolean' ? newGroup.enabled : false
-      };
-      
-      setGroups(prevGroups => [...prevGroups, safeNewGroup]);
-      
-      return safeNewGroup;
+      setGroups(prev => [...prev, newGroup]);
+      return newGroup;
     } catch (error) {
       console.error("Error adding group:", error);
       throw error;
@@ -113,10 +84,7 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
   const updateGroup = useCallback(async (group: WhitelistGroup) => {
     try {
       await axios.put(`${API_BASE_URL}/whitelist/groups/${group.id}`, group);
-      
-      setGroups(prevGroups => 
-        prevGroups.map(g => g.id === group.id ? group : g)
-      );
+      setGroups(prev => prev.map(g => g.id === group.id ? group : g));
     } catch (error) {
       console.error("Error updating group:", error);
       throw error;
@@ -126,8 +94,7 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
   const deleteGroup = useCallback(async (id: string) => {
     try {
       await axios.delete(`${API_BASE_URL}/whitelist/groups/${id}`);
-      
-      setGroups(prevGroups => prevGroups.filter(g => g.id !== id));
+      setGroups(prev => prev.filter(g => g.id !== id));
     } catch (error) {
       console.error("Error deleting group:", error);
       throw error;
@@ -155,12 +122,12 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       const response = await axios.post(`${API_BASE_URL}/whitelist/groups/${groupId}/clients`, client);
       
-      setGroups(prevGroups => 
-        prevGroups.map(group => {
+      setGroups(prev => 
+        prev.map(group => {
           if (group.id === groupId) {
             return {
               ...group,
-              clients: [...(Array.isArray(group.clients) ? group.clients : []), response.data]
+              clients: [...group.clients, response.data]
             };
           }
           return group;
@@ -176,12 +143,12 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       const response = await axios.post(`${API_BASE_URL}/whitelist/groups/${groupId}/destinations`, destination);
       
-      setGroups(prevGroups => 
-        prevGroups.map(group => {
+      setGroups(prev => 
+        prev.map(group => {
           if (group.id === groupId) {
             return {
               ...group,
-              destinations: [...(Array.isArray(group.destinations) ? group.destinations : []), response.data]
+              destinations: [...group.destinations, response.data]
             };
           }
           return group;
@@ -197,12 +164,12 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       await axios.delete(`${API_BASE_URL}/whitelist/groups/${groupId}/clients/${clientId}`);
       
-      setGroups(prevGroups => 
-        prevGroups.map(group => {
+      setGroups(prev => 
+        prev.map(group => {
           if (group.id === groupId) {
             return {
               ...group,
-              clients: (Array.isArray(group.clients) ? group.clients : []).filter(client => client.id !== clientId)
+              clients: group.clients.filter(client => client.id !== clientId)
             };
           }
           return group;
@@ -218,12 +185,12 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       await axios.delete(`${API_BASE_URL}/whitelist/groups/${groupId}/destinations/${destinationId}`);
       
-      setGroups(prevGroups => 
-        prevGroups.map(group => {
+      setGroups(prev => 
+        prev.map(group => {
           if (group.id === groupId) {
             return {
               ...group,
-              destinations: (Array.isArray(group.destinations) ? group.destinations : []).filter(dest => dest.id !== destinationId)
+              destinations: group.destinations.filter(dest => dest.id !== destinationId)
             };
           }
           return group;
