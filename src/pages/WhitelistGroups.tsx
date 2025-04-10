@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react";
 import { 
   Table, 
@@ -29,45 +28,66 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 
 export default function WhitelistGroups() {
-  const [groups, setGroups] = useState<WhitelistGroup[]>(mockWhitelistGroups);
+  const location = useLocation();
+  const { groups, addGroup, updateGroup, deleteGroup: removeGroup } = useWhitelistGroups();
   const [searchQuery, setSearchQuery] = useState("");
-  const [deleteGroup, setDeleteGroup] = useState<WhitelistGroup | null>(null);
+  const [deleteGroupItem, setDeleteGroupItem] = useState<WhitelistGroup | null>(null);
 
   useEffect(() => {
     document.title = "Whitelist Groups | Proxy Guard";
-  }, []);
+    
+    // Check if we have a new group from state navigation
+    if (location.state?.newGroup) {
+      const newGroup = location.state.newGroup;
+      addGroup(newGroup);
+      toast.success("Group created", { description: `${newGroup.name} has been created successfully` });
+      
+      // Clear the location state
+      window.history.replaceState({}, document.title);
+    }
+    
+    // Check if we have updated group info from state navigation
+    if (location.state?.updatedGroup) {
+      const updatedGroup = location.state.updatedGroup;
+      updateGroup(updatedGroup);
+      toast.success("Group updated", { description: `${updatedGroup.name} has been updated successfully` });
+      
+      // Clear the location state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, addGroup, updateGroup]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
 
   const handleToggleGroup = (groupId: string) => {
-    setGroups(groups.map(group => 
-      group.id === groupId ? { ...group, enabled: !group.enabled } : group
-    ));
-    
     const group = groups.find(g => g.id === groupId);
     if (group) {
+      const updatedGroup = { ...group, enabled: !group.enabled };
+      updateGroup(updatedGroup);
+      
       toast(
-        group.enabled ? "Group disabled" : "Group enabled", 
-        { description: `${group.name} has been ${group.enabled ? 'disabled' : 'enabled'}` }
+        updatedGroup.enabled ? "Group enabled" : "Group disabled", 
+        { description: `${updatedGroup.name} has been ${updatedGroup.enabled ? 'enabled' : 'disabled'}` }
       );
     }
   };
 
   const handleDeleteGroup = (group: WhitelistGroup) => {
-    setDeleteGroup(group);
+    setDeleteGroupItem(group);
   };
 
   const confirmDelete = () => {
-    if (deleteGroup) {
-      setGroups(groups.filter(g => g.id !== deleteGroup.id));
+    if (deleteGroupItem) {
+      removeGroup(deleteGroupItem.id);
       toast.success(`Group deleted`, { 
-        description: `${deleteGroup.name} has been deleted` 
+        description: `${deleteGroupItem.name} has been deleted` 
       });
-      setDeleteGroup(null);
+      setDeleteGroupItem(null);
     }
   };
 
@@ -179,12 +199,12 @@ export default function WhitelistGroups() {
         </Card>
       </div>
 
-      <AlertDialog open={!!deleteGroup} onOpenChange={() => setDeleteGroup(null)}>
+      <AlertDialog open={!!deleteGroupItem} onOpenChange={() => setDeleteGroupItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will permanently delete the group "{deleteGroup?.name}". 
+              This action will permanently delete the group "{deleteGroupItem?.name}". 
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
