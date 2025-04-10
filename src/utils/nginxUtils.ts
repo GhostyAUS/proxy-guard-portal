@@ -9,6 +9,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
  * Generates an NGINX configuration from whitelist groups
  */
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
+  console.log(`Generating nginx config from ${groups.length} groups`);
+  
   // Start with the base template
   let config = configTemplate;
   
@@ -40,13 +42,14 @@ ${destinationsMap}
   
   // Generate the access condition for the server block
   const accessConditions = groups.filter(g => g.enabled).map(group => 
-    `if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
-  ).join('\n    ');
+    `        if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
+  ).join('\n');
   
   // Replace placeholders in the template
   config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
   config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
   
+  console.log(`Generated nginx config with ${mapBlocks.length} map blocks`);
   return config;
 };
 
@@ -55,6 +58,7 @@ ${destinationsMap}
  */
 export const validateNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
   try {
+    console.log(`Validating nginx config, path: ${configPath}, length: ${config.length}`);
     const response = await axios.post(`${API_BASE_URL}/nginx/validate`, {
       configPath,
       config
@@ -72,6 +76,7 @@ export const validateNginxConfig = async (configPath: string, config: string): P
  */
 export const saveNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
   try {
+    console.log(`Saving nginx config, path: ${configPath}, length: ${config.length}`);
     const response = await axios.post(`${API_BASE_URL}/nginx/save`, {
       configPath,
       config
@@ -89,6 +94,7 @@ export const saveNginxConfig = async (configPath: string, config: string): Promi
  */
 export const reloadNginxConfig = async (): Promise<boolean> => {
   try {
+    console.log("Reloading nginx configuration");
     const response = await axios.post(`${API_BASE_URL}/nginx/reload`);
     return response.data.success === true;
   } catch (error) {
@@ -102,6 +108,7 @@ export const reloadNginxConfig = async (): Promise<boolean> => {
  */
 export const testConfigWritable = async (configPath: string): Promise<boolean> => {
   try {
+    console.log(`Testing if config is writable: ${configPath}`);
     const response = await axios.post(`${API_BASE_URL}/nginx/test-writable`, {
       configPath
     });

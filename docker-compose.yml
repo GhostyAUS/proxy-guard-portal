@@ -25,8 +25,8 @@ services:
       - CLIENT_AUTH_METHOD=${CLIENT_AUTH_METHOD:-none}
       - CLIENT_AUTH_REALM=${CLIENT_AUTH_REALM:-Proxy Access}
     volumes:
-      - nginx_config:/etc/nginx
-      - nginx_logs:/var/log/nginx
+      - nginx_config:/etc/nginx:rw
+      - nginx_logs:/var/log/nginx:rw
     depends_on:
       - nginx-proxy
     restart: unless-stopped
@@ -37,8 +37,8 @@ services:
       context: ./nginx
     network_mode: "host"
     volumes:
-      - nginx_config:/etc/nginx
-      - nginx_logs:/var/log/nginx
+      - nginx_config:/etc/nginx:rw
+      - nginx_logs:/var/log/nginx:rw
       - ./nginx/certs:/etc/nginx/certs:ro
     restart: unless-stopped
 

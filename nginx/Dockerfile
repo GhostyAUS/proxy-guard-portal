@@ -18,5 +18,9 @@ COPY nginx.conf.template /etc/nginx/nginx.conf.template
 # Create .htpasswd file for basic auth (if needed)
 RUN touch /etc/nginx/.htpasswd
 
-# Default command
-CMD ["nginx", "-g", "daemon off;"]
+# Make nginx config writable
+RUN chmod 777 /etc/nginx/
+RUN chmod 666 /etc/nginx/nginx.conf.template
+
+# Set proper write permissions on generated config
+CMD ["sh", "-c", "envsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && chmod 666 /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]

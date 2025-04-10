@@ -30,7 +30,7 @@ router.get('/nginx/status', async (req, res) => {
     // Check if nginx is running
     let isRunning = false;
     try {
-      await execPromise('nginx -s reload');
+      await execPromise('pgrep nginx || echo "not running"');
       isRunning = true;
     } catch (e) {
       // If command fails, nginx might not be running
@@ -39,19 +39,55 @@ router.get('/nginx/status', async (req, res) => {
 
     // Get last modification time of config file
     const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
+    console.log(`Checking nginx config at path: ${configPath}`);
+    
     let lastModified = new Date();
-    if (fs.existsSync(configPath)) {
-      const stats = fs.statSync(configPath);
-      lastModified = stats.mtime;
+    let configExists = false;
+    
+    try {
+      if (fs.existsSync(configPath)) {
+        configExists = true;
+        const stats = fs.statSync(configPath);
+        lastModified = stats.mtime;
+        console.log(`Config exists, last modified: ${lastModified}`);
+      } else {
+        console.log(`Config file does not exist at: ${configPath}`);
+      }
+    } catch (err) {
+      console.error(`Error checking config file: ${err.message}`);
     }
 
     // Test if config is valid
     let configValid = false;
     try {
-      await execPromise('nginx -t');
-      configValid = true;
+      if (configExists) {
+        await execPromise('nginx -t');
+        configValid = true;
+        console.log('Nginx config is valid');
+      }
     } catch (e) {
+      console.log('Nginx config is invalid or not accessible');
       configValid = false;
+    }
+
+    // Check if config is writable
+    let configWritable = false;
+    try {
+      if (configExists) {
+        fs.accessSync(configPath, fs.constants.W_OK);
+        configWritable = true;
+        console.log('Nginx config is writable');
+      } else {
+        const configDir = path.dirname(configPath);
+        if (fs.existsSync(configDir)) {
+          fs.accessSync(configDir, fs.constants.W_OK);
+          configWritable = true;
+          console.log('Nginx config directory is writable');
+        }
+      }
+    } catch (err) {
+      console.error(`Config is not writable: ${err.message}`);
+      configWritable = false;
     }
 
     res.json({
@@ -61,7 +97,8 @@ router.get('/nginx/status', async (req, res) => {
         success: configValid,
         message: configValid ? 'Configuration test successful' : 'Configuration test failed'
       },
-      configWritable: fs.accessSync(configPath, fs.constants.W_OK, (err) => !err)
+      configWritable,
+      configExists
     });
   } catch (error) {
     console.error('Error getting nginx status:', error);
@@ -73,12 +110,23 @@ router.get('/nginx/status', async (req, res) => {
 router.get('/nginx/config', (req, res) => {
   try {
     const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
+    console.log(`Reading nginx config from: ${configPath}`);
     
     if (!fs.existsSync(configPath)) {
+      console.log(`Config file doesn't exist, checking template`);
+      const templatePath = '/etc/nginx/nginx.conf.template';
+      
+      if (fs.existsSync(templatePath)) {
+        console.log(`Using template file instead`);
+        const config = fs.readFileSync(templatePath, 'utf8');
+        return res.json({ config, isTemplate: true });
+      }
+      
       return res.status(404).json({ error: 'Configuration file not found' });
     }
     
     const config = fs.readFileSync(configPath, 'utf8');
+    console.log(`Successfully read config file, length: ${config.length}`);
     res.json({ config });
   } catch (error) {
     console.error('Error reading nginx config:', error);
@@ -89,15 +137,18 @@ router.get('/nginx/config', (req, res) => {
 // Validate NGINX config syntax
 router.post('/nginx/validate', async (req, res) => {
   try {
-    const { config, configPath } = req.body;
+    const { config, configPath = '/etc/nginx/nginx.conf' } = req.body;
+    console.log(`Validating nginx config, length: ${config?.length || 0}`);
     
     // Write config to a temp file
     const tempFile = `/tmp/nginx-test-${Date.now()}.conf`;
     fs.writeFileSync(tempFile, config);
+    console.log(`Wrote config to temp file: ${tempFile}`);
     
     // Test the configuration with nginx -t
     try {
-      await execPromise(`nginx -c ${tempFile} -t`);
+      const result = await execPromise(`nginx -c ${tempFile} -t`);
+      console.log(`Nginx validation result: ${JSON.stringify(result)}`);
       
       // Clean up temp file
       fs.unlinkSync(tempFile);
@@ -109,6 +160,7 @@ router.post('/nginx/validate', async (req, res) => {
         fs.unlinkSync(tempFile);
       }
       
+      console.error(`Nginx validation failed: ${execError.stderr || execError.error}`);
       res.status(400).json({ 
         success: false, 
         error: execError.stderr || 'Configuration test failed'
@@ -123,24 +175,38 @@ router.post('/nginx/validate', async (req, res) => {
 // Save NGINX config
 router.post('/nginx/save', async (req, res) => {
   try {
-    const { config, configPath } = req.body;
+    const { config } = req.body;
+    const configPath = req.body.configPath || '/etc/nginx/nginx.conf';
+    
+    console.log(`Saving NGINX config to ${configPath}, length: ${config?.length || 0}`);
     
     // Create backup of existing config
     if (fs.existsSync(configPath)) {
       const backupPath = `${configPath}.bak-${Date.now()}`;
       fs.copyFileSync(configPath, backupPath);
+      console.log(`Created backup at ${backupPath}`);
     }
     
     // Ensure directory exists
     const configDir = path.dirname(configPath);
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
+      console.log(`Created directory ${configDir}`);
     }
     
     // Write new config
-    fs.writeFileSync(configPath, config);
-    
-    res.json({ success: true });
+    try {
+      fs.writeFileSync(configPath, config);
+      console.log('NGINX config saved successfully');
+      
+      res.json({ success: true });
+    } catch (writeError) {
+      console.error('Error writing config file:', writeError);
+      res.status(500).json({ 
+        success: false, 
+        error: `Failed to write config: ${writeError.message}` 
+      });
+    }
   } catch (error) {
     console.error('Error saving nginx config:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -150,13 +216,15 @@ router.post('/nginx/save', async (req, res) => {
 // Test if config path is writable
 router.post('/nginx/test-writable', (req, res) => {
   try {
-    const { configPath } = req.body;
+    const configPath = req.body.configPath || '/etc/nginx/nginx.conf';
+    console.log(`Testing if ${configPath} is writable`);
     
     // Test if directory is writable
     const configDir = path.dirname(configPath);
     
     // Check if directory exists
     if (!fs.existsSync(configDir)) {
+      console.log(`Directory ${configDir} does not exist`);
       return res.json({ 
         writable: false, 
         error: `Directory ${configDir} does not exist` 
@@ -169,8 +237,10 @@ router.post('/nginx/test-writable', (req, res) => {
     try {
       fs.writeFileSync(testFile, 'test');
       fs.unlinkSync(testFile);
+      console.log(`Directory ${configDir} is writable`);
       res.json({ writable: true });
     } catch (writeError) {
+      console.error(`Cannot write to ${configDir}: ${writeError.message}`);
       res.json({ 
         writable: false, 
         error: `Cannot write to ${configDir}: ${writeError.message}` 
@@ -185,9 +255,20 @@ router.post('/nginx/test-writable', (req, res) => {
 // Reload NGINX
 router.post('/nginx/reload', async (req, res) => {
   try {
+    console.log('Attempting to reload NGINX configuration...');
+    
     // Execute nginx reload command
-    await execPromise('nginx -s reload');
-    res.json({ success: true });
+    try {
+      const result = await execPromise('nginx -s reload');
+      console.log('NGINX reload successful:', result);
+      res.json({ success: true });
+    } catch (execError) {
+      console.error('Error executing nginx reload command:', execError);
+      res.status(500).json({ 
+        success: false, 
+        error: execError.stderr || 'Failed to reload NGINX'
+      });
+    }
   } catch (error) {
     console.error('Error reloading nginx:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -330,14 +411,28 @@ router.get('/logs', (req, res) => {
 // Get whitelist groups from NGINX config
 router.get('/whitelist-groups', (req, res) => {
   try {
+    console.log('Getting whitelist groups from nginx config');
     const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
     
     if (!fs.existsSync(configPath)) {
-      return res.status(404).json({ error: 'Configuration file not found' });
+      console.log(`Config file not found at: ${configPath}, checking template`);
+      const templatePath = '/etc/nginx/nginx.conf.template';
+      
+      if (fs.existsSync(templatePath)) {
+        console.log(`Using template file instead at: ${templatePath}`);
+        const config = fs.readFileSync(templatePath, 'utf8');
+        const groups = extractWhitelistGroups(config);
+        console.log(`Extracted ${groups.length} groups from template`);
+        return res.json({ groups });
+      }
+      
+      console.log('No config file or template found, returning empty groups');
+      return res.json({ groups: [] });
     }
     
     const config = fs.readFileSync(configPath, 'utf8');
     const groups = extractWhitelistGroups(config);
+    console.log(`Extracted ${groups.length} groups from config file`);
     
     res.json({ groups });
   } catch (error) {
@@ -346,13 +441,73 @@ router.get('/whitelist-groups', (req, res) => {
   }
 });
 
+// Debug endpoint to get available routes
+router.get('/debug/routes', (req, res) => {
+  try {
+    // Get all registered routes
+    const routes = [];
+    
+    // Walk through all layers recursively
+    function extractRoutes(stack, basePath = '') {
+      for (const layer of stack) {
+        if (layer.route) {
+          // Routes registered directly on the router
+          const methods = Object.keys(layer.route.methods)
+            .filter(method => layer.route.methods[method])
+            .map(method => method.toUpperCase());
+            
+          routes.push(`${methods.join(',')} ${basePath}${layer.route.path}`);
+        } else if (layer.name === 'router' && layer.handle.stack) {
+          // Nested routers
+          const path = layer.regexp.source.replace('^\\/','').replace('(?=\\/|$)', '').replace(/\\\//g, '/');
+          extractRoutes(layer.handle.stack, basePath + '/' + path);
+        }
+      }
+    }
+    
+    // Get routes from the router itself
+    if (router.stack) {
+      extractRoutes(router.stack);
+    }
+    
+    // Get routes from the parent app if available
+    if (req.app && req.app._router && req.app._router.stack) {
+      extractRoutes(req.app._router.stack);
+    }
+    
+    res.json({ 
+      routes,
+      baseUrl: process.env.API_BASE_URL || '/api',
+      configPath: process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf'
+    });
+  } catch (error) {
+    console.error('Error getting api routes:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: {
+      NGINX_CONFIG_PATH: process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf',
+      API_BASE_URL: process.env.API_BASE_URL || '/api',
+      NODE_ENV: process.env.NODE_ENV
+    }
+  });
+});
+
 // Helper function to extract whitelist groups from NGINX config
 function extractWhitelistGroups(config) {
+  console.log('Extracting whitelist groups from config');
   const groups = [];
   let currentGroup = null;
   
   // Extract group comments and maps
   const lines = config.split('\n');
+  console.log(`Config has ${lines.length} lines`);
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -360,6 +515,7 @@ function extractWhitelistGroups(config) {
     // Check for group comment
     if (line.startsWith('# Group:')) {
       const name = line.replace('# Group:', '').trim();
+      console.log(`Found group: ${name}`);
       currentGroup = {
         id: `group-${Date.now()}-${groups.length}`,
         name,
@@ -372,6 +528,7 @@ function extractWhitelistGroups(config) {
     
     // Check for client IPs map
     if (line.startsWith('map $remote_addr $client_') && currentGroup) {
+      console.log(`Found client map for group: ${currentGroup.name}`);
       const clientMapLines = getMapBlock(lines, i);
       
       // Extract client IPs
@@ -384,6 +541,7 @@ function extractWhitelistGroups(config) {
             value: ipValue,
             description: ''
           });
+          console.log(`Added client IP: ${ipValue}`);
         }
       }
       
@@ -393,6 +551,7 @@ function extractWhitelistGroups(config) {
     
     // Check for destinations map
     if (line.startsWith('map $http_host $dest_') && currentGroup) {
+      console.log(`Found destination map for group: ${currentGroup.name}`);
       const destMapLines = getMapBlock(lines, i);
       
       // Extract destinations
@@ -405,11 +564,13 @@ function extractWhitelistGroups(config) {
             value: destValue,
             description: ''
           });
+          console.log(`Added destination: ${destValue}`);
         }
       }
       
       // Add group to list and reset current group
       groups.push(currentGroup);
+      console.log(`Completed group: ${currentGroup.name}`);
       currentGroup = null;
       
       // Skip processed lines
