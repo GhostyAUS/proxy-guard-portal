@@ -1,4 +1,5 @@
 
+// This file uses ES Module syntax for compatibility with type:module in package.json
 console.log("Starting API server from pre-created file");
 import express from "express";
 const app = express();

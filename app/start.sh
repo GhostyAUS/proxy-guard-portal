@@ -12,7 +12,8 @@ if [ -f "/app/server/index.js" ]; then
   head -n 10 /app/server/index.js
   
   echo "Starting API server in Node.js ESM mode..."
-  node /app/server/index.js &
+  # Use node --no-warnings to suppress ESM warnings
+  node --no-warnings /app/server/index.js &
   API_PID=$!
   echo "API server started with PID: $API_PID"
   
@@ -21,6 +22,10 @@ if [ -f "/app/server/index.js" ]; then
     echo "API server running successfully"
   else
     echo "ERROR: API server failed to start properly"
+    # Try to detect what went wrong
+    echo "Node.js version: $(node --version)"
+    echo "Testing ES module import support..."
+    node -e "import('fs').then(() => console.log('ESM imports work'))" || echo "ESM imports fail"
   fi
 else
   echo "WARNING: API server file not found, skipping backend startup"
@@ -28,28 +33,48 @@ else
   find /app -type f -name "*.js" | sort
 fi
 
-# Check for package.json and scripts
+# Create a simple package.json with a start script if it doesn't exist
+if [ ! -f "package.json" ] || ! grep -q "\"start\":" package.json; then
+  echo "Creating or updating package.json with start script..."
+  cat > package.json << EOF
+{
+  "name": "proxy-guard-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "npx serve -s dist || npx serve || echo 'No frontend to serve'"
+  }
+}
+EOF
+  echo "Created package.json with start script"
+fi
+
+# Show package.json contents
 echo "Package.json contents:"
 cat package.json
 
-# Check if there's a start script in package.json
-if grep -q "\"start\":" package.json; then
-  echo "Found start script in package.json, running npm start..."
-  NODE_ENV=production npm start
-else
-  echo "No start script found in package.json. Using alternative method to start the app..."
+# Check if dist directory exists and if it has files
+if [ -d "dist" ]; then
+  echo "Found dist directory, contents:"
+  ls -la dist || echo "Empty dist directory"
+fi
+
+# Finally start the frontend with the npm start script that should now exist
+echo "Starting frontend..."
+NODE_ENV=production npm start || {
+  echo "Frontend start script failed, trying alternatives..."
   
-  # Try to determine how to start the app
-  if [ -f "dist/index.html" ]; then
-    echo "Found dist/index.html, serving with a simple HTTP server..."
+  # Fallback serving mechanism
+  if [ -d "dist" ] && [ -f "dist/index.html" ]; then
+    echo "Serving dist directory..."
     npx serve -s dist
   elif [ -f "index.html" ]; then
-    echo "Found index.html, serving with a simple HTTP server..."
+    echo "Serving current directory..."
     npx serve
   else
-    echo "ERROR: Could not determine how to start the frontend. Files in current directory:"
-    ls -la
-    echo "Waiting indefinitely to keep container alive for debugging..."
+    echo "ERROR: Could not determine how to start the frontend. Keeping container alive for debugging..."
+    echo "Current directory structure:"
+    find . -type f -name "*.html" | sort
     tail -f /dev/null
   fi
-fi
+}
