@@ -12,15 +12,14 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
-import { mockWhitelistGroups, mockNginxStatus } from "@/utils/mockData";
+import { mockNginxStatus } from "@/utils/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { v4 as uuidv4 } from "uuid";
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 
 export default function Dashboard() {
   const [nginxStatus] = useState(mockNginxStatus);
-  const { groups: whitelistGroups } = useWhitelistGroups();
+  const { groups: whitelistGroups, isLoading, error } = useWhitelistGroups();
   
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";
@@ -130,57 +129,81 @@ export default function Dashboard() {
         </div>
 
         <h2 className="text-xl font-semibold mt-6">Whitelist Groups</h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {whitelistGroups.map((group) => (
-            <Card key={group.id} className="overflow-hidden">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>{group.name}</CardTitle>
-                  <Badge variant={group.enabled ? "default" : "outline"}>
-                    {group.enabled ? "Enabled" : "Disabled"}
-                  </Badge>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="ml-2">Loading whitelist groups...</span>
+          </div>
+        ) : error ? (
+          <Card>
+            <CardContent className="py-6">
+              <div className="flex flex-col items-center gap-3">
+                <div className="rounded-full p-3 bg-red-50">
+                  <XCircle className="h-6 w-6 text-red-500" />
                 </div>
-                <CardDescription>{group.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-2">
-                  <div>
-                    <h3 className="text-sm font-medium">Clients</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {group.clients.length} IPs/Subnets
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium">Destinations</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {group.destinations.length} URLs/Domains
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="bg-muted/50 p-2">
-                <Button variant="ghost" size="sm" className="w-full" asChild>
-                  <Link to={`/whitelist/${group.id}`} className="flex items-center justify-center gap-1">
-                    View details
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
+                <h3 className="text-lg font-medium">Error Loading Groups</h3>
+                <p className="text-sm text-center text-muted-foreground max-w-md">
+                  {error}
+                </p>
+                <Button asChild className="mt-2">
+                  <Link to="/whitelist">Manage Whitelist Groups</Link>
                 </Button>
-              </CardFooter>
-            </Card>
-          ))}
-          <Card className="flex flex-col items-center justify-center p-6 border-dashed">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
-              <ListFilter className="h-10 w-10 text-muted-foreground" />
-            </div>
-            <h3 className="mt-4 text-xl font-medium">Create a new group</h3>
-            <p className="mb-4 mt-2 text-center text-sm text-muted-foreground">
-              Create a new whitelist group to manage access control.
-            </p>
-            <Button asChild>
-              <Link to="/whitelist/create">Create Whitelist Group</Link>
-            </Button>
+              </div>
+            </CardContent>
           </Card>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {whitelistGroups.map((group) => (
+              <Card key={group.id} className="overflow-hidden">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>{group.name}</CardTitle>
+                    <Badge variant={group.enabled ? "default" : "outline"}>
+                      {group.enabled ? "Enabled" : "Disabled"}
+                    </Badge>
+                  </div>
+                  <CardDescription>{group.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-2">
+                    <div>
+                      <h3 className="text-sm font-medium">Clients</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {group.clients?.length || 0} IPs/Subnets
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium">Destinations</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {group.destinations?.length || 0} URLs/Domains
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="bg-muted/50 p-2">
+                  <Button variant="ghost" size="sm" className="w-full" asChild>
+                    <Link to={`/whitelist/${group.id}`} className="flex items-center justify-center gap-1">
+                      View details
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+            <Card className="flex flex-col items-center justify-center p-6 border-dashed">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                <ListFilter className="h-10 w-10 text-muted-foreground" />
+              </div>
+              <h3 className="mt-4 text-xl font-medium">Create a new group</h3>
+              <p className="mb-4 mt-2 text-center text-sm text-muted-foreground">
+                Create a new whitelist group to manage access control.
+              </p>
+              <Button asChild>
+                <Link to="/whitelist/create">Create Whitelist Group</Link>
+              </Button>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   );
