@@ -1,274 +1,129 @@
+import { WhitelistGroup } from "@/types/proxy";
 
-import { WhitelistGroup, NginxStatus } from "@/types/proxy";
-import axios from "axios";
-
-// API endpoint for nginx operations
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-
-/**
- * Generates an NGINX configuration from whitelist groups
- * Formats IP whitelist and URL whitelist sections
- */
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
-  console.log(`Generating nginx config from ${groups.length} groups`);
-  
-  // Start with the template
+  // Start with the base template
   let config = configTemplate;
   
-  // Generate IP whitelist section
-  let ipWhitelistSection = `    geo $whitelist {\n        default 0;\n`;
-  let urlWhitelistSection = `    map $host $is_allowed_url {\n        default 0;  # Block by default - deny unless explicitly allowed\n\n        # Allow specific domains below:\n`;
-  
-  // Process each enabled group
-  groups.filter(g => g.enabled).forEach(group => {
-    // Add comments for the group
-    ipWhitelistSection += `\n        # Group: ${group.name}\n`;
-    urlWhitelistSection += `\n        # Group: ${group.name}\n`;
+  // Generate the map blocks for IPs and destinations
+  const mapBlocks = groups.filter(g => g.enabled).map(group => {
+    // Generate the client IPs map
+    const clientIpsMap = group.clients.map(client => 
+      `    ${client.value} 1;`
+    ).join('\n');
     
-    if (group.description) {
-      ipWhitelistSection += `        # ${group.description}\n`;
-      urlWhitelistSection += `        # ${group.description}\n`;
-    }
+    // Generate the destinations map
+    const destinationsMap = group.destinations.map(dest => 
+      `    ${dest.value} 1;`
+    ).join('\n');
     
-    // Add all client IPs from this group
-    group.clients.forEach(client => {
-      ipWhitelistSection += `        ${client.value} 1;`;
-      if (client.description) {
-        ipWhitelistSection += `  # ${client.description}`;
-      }
-      ipWhitelistSection += '\n';
-    });
-    
-    // Add all destinations from this group
-    group.destinations.forEach(dest => {
-      // Format destination correctly based on whether it's a regex or exact match
-      const formattedDest = dest.value.includes('*') ? 
-        `"~^.*\\.${dest.value.replace(/\*/g, '').replace(/\./g, '\\.')}$"` : 
-        `"${dest.value}"`;
-      
-      urlWhitelistSection += `        ${formattedDest} 1;`;
-      if (dest.description) {
-        urlWhitelistSection += `  # ${dest.description}`;
-      }
-      urlWhitelistSection += '\n';
-    });
-  });
+    return `
+# Group: ${group.name}
+map $remote_addr $client_${group.id} {
+    default 0;
+${clientIpsMap}
+}
+
+map $http_host $dest_${group.id} {
+    default 0;
+${destinationsMap}
+}
+`;
+  }).join('\n');
   
-  // Close the sections
-  ipWhitelistSection += "    }\n";
-  urlWhitelistSection += "    }\n";
+  // Generate the access condition for the server block
+  const accessConditions = groups.filter(g => g.enabled).map(group => 
+    `if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
+  ).join('\n    ');
   
-  // Replace the placeholders in the template
-  config = config.replace(/geo \$whitelist \{[\s\S]*?\}/, ipWhitelistSection);
-  config = config.replace(/map \$host \$is_allowed_url \{[\s\S]*?\}/, urlWhitelistSection);
+  // Replace placeholders in the template
+  config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
+  config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
   
-  console.log("Generated nginx config successfully");
   return config;
 };
 
-/**
- * Test if the Nginx config file is writable
- */
-export const testConfigWritable = async (): Promise<boolean> => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/nginx/config-writable`);
-    return response.data.writable === true;
-  } catch (error) {
-    console.error("Error testing config writability:", error);
-    return false;
-  }
+export const validateNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
+  // This is a mock function - in a real implementation this would make an API call to test the nginx config
+  return true;
 };
 
-/**
- * Fetches the current NGINX configuration
- */
-export const fetchNginxConfig = async (): Promise<string> => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/nginx/config`);
-    return response.data.config;
-  } catch (error) {
-    console.error("Error fetching NGINX config:", error);
-    throw new Error("Failed to fetch NGINX configuration");
-  }
+export const saveNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
+  // This is a mock function - in a real implementation this would make an API call to save the nginx config
+  console.log("Saving nginx config to", configPath);
+  console.log(config);
+  return true;
 };
 
-/**
- * Saves the NGINX configuration
- */
-export const saveNginxConfig = async (config: string): Promise<boolean> => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/nginx/save`, { config });
-    return response.data.success === true;
-  } catch (error) {
-    console.error("Error saving NGINX config:", error);
-    throw new Error("Failed to save NGINX configuration");
-  }
+export const reloadNginxConfig = async (): Promise<boolean> => {
+  // This is a mock function - in a real implementation this would make an API call to reload nginx
+  return true;
 };
 
-/**
- * Restarts the NGINX container
- */
-export const restartNginxContainer = async (): Promise<boolean> => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/nginx/restart`);
-    return response.data.success === true;
-  } catch (error) {
-    console.error("Error restarting NGINX container:", error);
-    throw new Error("Failed to restart NGINX container");
-  }
+export const testConfigWritable = async (configPath: string): Promise<boolean> => {
+  // This is a mock function - in a real implementation this would check if the config file is writable
+  return true;
 };
 
-/**
- * Gets the current status of NGINX
- */
-export const getNginxStatus = async (): Promise<NginxStatus> => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/nginx/status`);
-    return response.data;
-  } catch (error) {
-    console.error("Error getting NGINX status:", error);
-    throw new Error("Failed to get NGINX status");
-  }
-};
-
-/**
- * Validates the NGINX configuration syntax
- */
-export const validateNginxConfig = async (config: string): Promise<boolean> => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/nginx/validate`, { config });
-    return response.data.success === true;
-  } catch (error) {
-    console.error("Error validating NGINX config:", error);
-    throw new Error("Failed to validate NGINX configuration");
-  }
-};
-
-// Default nginx template with placeholders for whitelist sections
+// Updated nginx combined proxy template
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
-daemon off;
+error_log /var/log/nginx/error.log info;
 
 events {
     worker_connections 1024;
 }
 
 http {
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent" "$http_x_forwarded_for"';
-   
-    log_format denied '$remote_addr - [$time_local] "$request" '
-                      '$status "$http_user_agent" "$http_referer" '
-                      'Host: "$host" URI: "$request_uri" '
-                      'Client: "$remote_addr" '
-                      'Reason: "$deny_reason"';
-	   
-    access_log /var/log/nginx/access.log main;
-    error_log /var/log/nginx/error.log info;
-    access_log /var/log/nginx/denied.log denied if=$deny_log;
-
-
-#==============================================================================
-    #IP WHITELIST
-    # Use geo module to determine if incoming IP is on whitelist
-    geo $whitelist {
-        default 0;
-        # Allow Individual IPs below:
-        127.0.0.1 1;  # Example localhost
-    }
+    access_log /var/log/nginx/access.log;
     
-    # ------------------------------------
-    # URL WHITELIST
-    # url filtering for external addresses - default-deny approach
-       
-    map $host $is_allowed_url {
-        default 0;  # Block by default - deny unless explicitly allowed
-    
-        # Allow specific domains below:
-        "example.com" 1;  # Example domain
-    }
-# END OF CODE TO EDIT, DO NOT EDIT BELOW.
-# ==============================================================================
-
-    # Variables for logging denied requests
-    map $status $deny_log {
-        ~^4 1;  # Log all 4xx responses (including 403 denied requests)
+    # Define variables for access control
+    map $remote_addr $allow_access {
         default 0;
     }
     
-    # Map to set denial reason
-    map "$whitelist:$is_allowed_url" $deny_reason {
-        "0:0" "IP not whitelisted and URL not allowed";
-        "0:1" "IP not whitelisted";
-        "1:0" "URL not in allowed list";
-        default "";
-    }
-
+# PLACEHOLDER:MAP_BLOCKS
+    
     server {
-        listen 8080;
-        # External DNS server/s
-        resolver 8.8.8.8 1.1.1.1 ipv6=off;
-
-        # Use the geo variable for access control
-        if ($whitelist = 0) {
-            set $deny_reason "IP not whitelisted: $remote_addr";
-            return 403 "Access denied: Your IP is not whitelisted.";
+        listen 8080 ssl http2;
+        
+        # SSL configuration for HTTPS
+        ssl_certificate /etc/nginx/certs/server.crt;
+        ssl_certificate_key /etc/nginx/certs/server.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+        
+        # Check if client is allowed to access the requested destination
+        # PLACEHOLDER:ACCESS_CONDITIONS
+        
+        # Block access if not allowed
+        if ($allow_access != 1) {
+            return 403 "Access denied";
         }
-
-        # Block disallowed URLs
-        if ($is_allowed_url = 0) {
-            set $deny_reason "URL not in allowed list: $host";
-            return 403 "Access denied: This URL is not in the allowed list.";
-        }
-
-        # HTTPS CONNECT method handling
-        proxy_connect;
-        proxy_connect_allow all;  # Allow all ports for HTTPS connections
-        proxy_connect_connect_timeout 10s;
-        proxy_connect_read_timeout 60s;
-        proxy_connect_send_timeout 60s;
-
-        # Security headers
-        proxy_hide_header Upgrade;
-        proxy_hide_header X-Powered-By;
-        add_header Content-Security-Policy "upgrade-insecure-requests";
-        add_header X-Frame-Options "SAMEORIGIN";
-        add_header X-XSS-Protection "1; mode=block" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header Cache-Control "no-transform" always;
-        add_header Referrer-Policy no-referrer always;
-        add_header X-Robots-Tag none;
-
-        # HTTP forwarding
+        
+        # Forward proxy configuration
+        resolver 8.8.8.8 ipv6=off;
+        
+        # HTTP/HTTPS proxy - handles both protocols
         location / {
-            # Check whitelist again at location level
-            if ($whitelist = 0) {
-                set $deny_reason "IP not whitelisted at location level: $remote_addr";
-                return 403 "Access denied: Your IP is not whitelisted.";
-            }
-
-            # Check URL filtering again at location level
-            if ($is_allowed_url = 0) {
-                set $deny_reason "URL not in allowed list at location level: $host";
-                return 403 "Access denied: This URL is not in the allowed list.";
-            }
-
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header Connection "";  # Enable keepalives
-            proxy_pass $scheme://$host$request_uri;  # Include $request_uri
-
-            # Additional useful headers
+            # Authentication settings (if enabled)
+            auth_basic_user_file /etc/nginx/.htpasswd;
+            
+            # Handle HTTP and HTTPS traffic
+            proxy_pass $scheme://$http_host$request_uri;
+            proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-
-            # Timeouts for better reliability
-            proxy_connect_timeout 10s;
+            proxy_connect_timeout 60s;
             proxy_send_timeout 60s;
             proxy_read_timeout 60s;
+            
+            # HTTPS CONNECT method handling
+            proxy_ssl_server_name on;
+            proxy_ssl_session_reuse on;
         }
     }
-}`;
-
+}
+`;

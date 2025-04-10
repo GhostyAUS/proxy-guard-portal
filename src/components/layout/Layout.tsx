@@ -1,25 +1,26 @@
 
-import React from "react";
-import { Sidebar } from "./Sidebar";
+import { ReactNode } from "react";
 import { Header } from "./Header";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { Sidebar } from "./Sidebar";
+import { MobileNav } from "./MobileNav";
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
-  const isMobile = useIsMobile();
-
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar sidebarClassName={isMobile ? "hidden" : "w-64 border-r"} />
-      
-      <div className="flex flex-col flex-1">
-        <Header />
-        <main className="flex-1 p-6">
-          {children}
-        </main>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <div className="flex flex-1">
+        <Sidebar />
+        <div className="flex flex-1 flex-col md:pl-64">
+          <div className="flex md:hidden items-center h-14 border-b px-4">
+            <MobileNav />
+            <h1 className="text-lg font-medium ml-2">Proxy Guard</h1>
+          </div>
+          <main className="flex-1 p-4 md:p-6">{children}</main>
+        </div>
       </div>
     </div>
   );

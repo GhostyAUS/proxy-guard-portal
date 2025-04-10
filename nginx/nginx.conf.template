@@ -7,61 +7,40 @@ events {
 }
 
 http {
-    include       /etc/nginx/mime.types;
-    default_type  application/octet-stream;
+    access_log /var/log/nginx/access.log;
     
-    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                     '$status $body_bytes_sent "$http_referer" '
-                     '"$http_user_agent" "$http_x_forwarded_for"';
+    # Define variables for access control
+    map $remote_addr $allow_access {
+        default 0;
+    }
     
-    access_log /var/log/nginx/access.log main;
+    # Sample group
+    map $remote_addr $client_default {
+        default 0;
+        192.168.0.0/16 1;  # Local network
+        127.0.0.1 1;       # Localhost
+    }
     
-    # Define variable for access control
-    set $allow_access 0;
-    
-    # IP and hostname whitelist configurations will be inserted here
-    # PLACEHOLDER:WHITELIST_CONFIG
-    
-    # Proxy API requests to the Node.js backend
-    server {
-        listen 80;
-        server_name localhost;
-        
-        # API proxy for backend services
-        location /api/ {
-            proxy_pass http://localhost:3001/api/;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection 'upgrade';
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_cache_bypass $http_upgrade;
-        }
-        
-        # Serve frontend static files
-        location / {
-            root /app/dist;
-            index index.html;
-            try_files $uri $uri/ /index.html;
-        }
+    map $http_host $dest_default {
+        default 0;
+        example.com 1;     # Example site
+        *.google.com 1;    # Google domains
     }
     
     server {
-        listen 8080;
+        listen 8080 ssl http2;
         
-        # Use the proper http2 directive
-        http2 on;
-        
-        # Make SSL optional - only enable if certificates exist
-        ssl_certificate_key /etc/nginx/certs/server.key;
+        # SSL configuration for HTTPS
         ssl_certificate /etc/nginx/certs/server.crt;
-        
+        ssl_certificate_key /etc/nginx/certs/server.key;
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers HIGH:!aNULL:!MD5;
         ssl_prefer_server_ciphers on;
         ssl_session_cache shared:SSL:10m;
         ssl_session_timeout 10m;
+        
+        # Check if client is allowed to access the requested destination
+        if ($client_default = 1 && $dest_default = 1) { set $allow_access 1; }
         
         # Block access if not allowed
         if ($allow_access != 1) {
@@ -73,9 +52,9 @@ http {
         
         # HTTP/HTTPS proxy - handles both protocols
         location / {
-            # Authentication settings (if enabled)
-            auth_basic "Proxy Authentication";
-            auth_basic_user_file /etc/nginx/.htpasswd;
+            # Authentication settings - comment out if not needed
+            #auth_basic "Proxy Authentication";
+            #auth_basic_user_file /etc/nginx/.htpasswd;
             
             # Handle HTTP and HTTPS traffic
             proxy_pass $scheme://$http_host$request_uri;

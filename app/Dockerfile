@@ -1,28 +1,7 @@
 
-FROM node:18-alpine
+FROM node:18-alpine AS build
 
 WORKDIR /app
-
-# Add build argument for npm flags
-ARG NPM_FLAGS="--legacy-peer-deps"
-
-# Install nginx and other required packages
-RUN apk add --no-cache nginx curl bash openssl sudo busybox
-
-# Create directories for NGINX operations
-RUN mkdir -p /etc/nginx
-RUN mkdir -p /var/log/nginx
-RUN mkdir -p /etc/nginx/certs
-RUN touch /var/log/nginx/access.log /var/log/nginx/error.log
-RUN chmod 666 /var/log/nginx/access.log /var/log/nginx/error.log
-
-# Generate self-signed SSL certificates for HTTPS proxy
-RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/nginx/certs/server.key -out /etc/nginx/certs/server.crt \
-    -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
-
-# Copy nginx config template
-COPY nginx/nginx.conf.template /app/nginx/nginx.conf.template
 
 # Copy necessary files
 COPY . .
@@ -30,18 +9,15 @@ COPY . .
 # Debug what's in the directory
 RUN echo "Current working directory contents:" && ls -la
 
-# Install dependencies with --legacy-peer-deps flag to bypass peer dependency conflicts
+# Install dependencies
 RUN if [ -f "package.json" ]; then \
       echo "Found package.json, installing dependencies..." && \
-      npm install $NPM_FLAGS; \
+      npm install; \
     else \
       echo "No package.json found in current directory, searching..." && \
       find / -name "package.json" -not -path "*/node_modules/*" -not -path "*/\.*" | head -n 5 && \
       echo "Error: package.json not found in expected location" && exit 1; \
     fi
-
-# Install backend dependencies for NGINX operations with --legacy-peer-deps flag
-RUN npm install express bcrypt readline fs-extra --legacy-peer-deps
 
 # Build the application (if there's a build script)
 RUN if grep -q "\"build\":" package.json; then \
@@ -51,28 +27,37 @@ RUN if grep -q "\"build\":" package.json; then \
       echo "No build script found in package.json, skipping build step"; \
     fi
 
-# Create server directory if it doesn't exist and copy server files
-RUN mkdir -p /app/server
-COPY ./src/server/index.cjs /app/server/
-COPY ./src/server/nginx-service.cjs /app/server/
+# Production stage
+FROM node:18-alpine
 
-# Create the setup permissions script
-COPY app/setup-permissions.sh /app/setup-permissions.sh
-RUN chmod +x /app/setup-permissions.sh
+WORKDIR /app
 
-# Create start.sh for process management
-COPY app/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+# Copy built files from build stage
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./
 
-# Create api-server directory for shell-based API
-RUN mkdir -p /app/api-server
+# Create a minimal start script if it doesn't exist
+RUN echo "Checking package.json for start script:" && \
+    cat package.json | grep -A 10 "\"scripts\"" || echo "No scripts section found" && \
+    if ! grep -q "\"start\":" package.json; then \
+      echo "Adding start script to package.json" && \
+      sed -i 's/"scripts": {/"scripts": {\n    "start": "vite preview --host 0.0.0.0 --port 3000",/' package.json || \
+      (echo "Failed to add start script with sed, creating manually" && \
+       if ! grep -q "\"scripts\"" package.json; then \
+         echo "No scripts section found, creating one" && \
+         sed -i 's/^{/{\n  "scripts": {\n    "start": "vite preview --host 0.0.0.0 --port 3000"\n  },/' package.json; \
+       else \
+         echo "Scripts section exists but no start script, adding one" && \
+         sed -i '/"scripts": {/a \    "start": "vite preview --host 0.0.0.0 --port 3000",' package.json; \
+       fi); \
+    fi
 
-# Create the nginx-manager.sh script
-COPY app/nginx-manager.sh /app/nginx-manager.sh
-RUN chmod +x /app/nginx-manager.sh
+# Make sure the start script is available and show final package.json
+RUN echo "Final package.json content:" && cat package.json
 
-# Expose necessary ports
-EXPOSE 3001 8080 8443
+# Expose port
+EXPOSE 3000
 
-# Set the entrypoint
-ENTRYPOINT ["/bin/sh", "-c", "/app/setup-permissions.sh && nginx && /app/start.sh"]
+# Start application
+CMD ["npm", "start"]

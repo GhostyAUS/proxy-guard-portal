@@ -20,25 +20,43 @@ export interface WhitelistGroup {
   enabled: boolean;
 }
 
+export interface ProxySettings {
+  nginxConfigPath: string;
+  isReadOnly: boolean;
+  proxyPort: string; // Combined HTTP/HTTPS port
+  authType: 'none' | 'ldap' | 'saml';
+  ldapSettings?: {
+    serverUrl: string;
+    bindDn: string;
+    searchBase: string;
+    searchFilter: string;
+    useLdaps?: boolean;
+    ldapPort?: string;
+  };
+  samlSettings?: {
+    entityId: string;
+    assertionConsumerService: string;
+    idpMetadataUrl: string;
+  };
+  clientAuth?: {
+    requireAuth: boolean;
+    authMethod: 'none' | 'ldap' | 'basic';
+    realm?: string;
+    ldapUrl?: string;
+    ldapBindDn?: string;
+    ldapSearchBase?: string;
+    ldapSearchFilter?: string;
+    ldapPort?: string;
+    useLdaps?: boolean;
+  };
+}
+
 export interface NginxStatus {
   isRunning: boolean;
-  version?: string;
   lastConfigTest: {
     success: boolean;
     message: string;
   };
   lastModified: string;
   configWritable: boolean;
-}
-
-export interface ProxySettings {
-  httpPort: number;
-  httpsPort: number;
-  maxUploadSize: string;
-  sslCertPath: string;
-  logLevel: string;
-  enableAuthentication: boolean;
-  authUsers?: { username: string; password: string }[];
-  enableIPv6: boolean;
-  dnsResolvers: string[];
 }

@@ -1,26 +1,22 @@
-
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ArrowRight, CheckCircle2, Server, XCircle } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { mockWhitelistGroups, mockNginxStatus } from "@/utils/mockData";
 import { Link } from "react-router-dom";
-import { useNginxStatus } from "@/hooks/useNginxStatus";
-import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
-import { Skeleton } from "@/components/ui/skeleton";
-import { NginxStatus } from "@/types/proxy";
 
 export default function HttpProxy() {
-  const { groups, isLoading: isLoadingGroups } = useWhitelistGroups();
-  const { data: nginxStatus, isLoading: isLoadingStatus } = useNginxStatus();
+  const [whitelistGroups] = useState(mockWhitelistGroups);
+  const [nginxStatus] = useState(mockNginxStatus);
   
   useEffect(() => {
     document.title = "HTTP Proxy | Proxy Guard";
   }, []);
   
-  const activeGroups = groups?.filter(group => group.enabled) || [];
+  const activeGroups = whitelistGroups.filter(group => group.enabled);
 
   return (
     <Layout>
@@ -31,75 +27,65 @@ export default function HttpProxy() {
           <Card>
             <CardHeader>
               <CardTitle>HTTP Proxy Status</CardTitle>
-              <CardDescription>HTTP forward proxy on port 80</CardDescription>
+              <CardDescription>HTTP forward proxy on port 8080</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isLoadingStatus ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
+              <div className="flex items-center gap-2">
+                {nginxStatus.isRunning ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    <span className="font-medium text-green-500">Running</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5 text-destructive" />
+                    <span className="font-medium text-destructive">Not Running</span>
+                  </>
+                )}
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium mb-2">Configuration</h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Listening Port:</span>
+                    <span className="font-mono">8080</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Network Mode:</span>
+                    <span className="font-mono">Host</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">DNS Resolver:</span>
+                    <span className="font-mono">8.8.8.8</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Connection Timeout:</span>
+                    <span className="font-mono">60s</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Active Whitelist Groups:</span>
+                    <Badge variant="outline">{activeGroups.length}</Badge>
+                  </li>
+                </ul>
+              </div>
+              
+              {nginxStatus.isRunning ? (
+                <Alert className="bg-green-50 border-green-200">
+                  <Server className="h-4 w-4 text-green-500" />
+                  <AlertTitle>Proxy is active</AlertTitle>
+                  <AlertDescription>
+                    HTTP proxy is running on host network and accepting connections on port 8080.
+                  </AlertDescription>
+                </Alert>
               ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    {(nginxStatus as NginxStatus)?.isRunning ? (
-                      <>
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        <span className="font-medium text-green-500">Running</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-5 w-5 text-destructive" />
-                        <span className="font-medium text-destructive">Not Running</span>
-                      </>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Configuration</h3>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Listening Port:</span>
-                        <span className="font-mono">80</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Network Mode:</span>
-                        <span className="font-mono">Host</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">DNS Resolver:</span>
-                        <span className="font-mono">8.8.8.8</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Connection Timeout:</span>
-                        <span className="font-mono">60s</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span className="text-muted-foreground">Active Whitelist Groups:</span>
-                        <Badge variant="outline">{activeGroups.length}</Badge>
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  {(nginxStatus as NginxStatus)?.isRunning ? (
-                    <Alert className="bg-green-50 border-green-200">
-                      <Server className="h-4 w-4 text-green-500" />
-                      <AlertTitle>Proxy is active</AlertTitle>
-                      <AlertDescription>
-                        HTTP proxy is running on host network and accepting connections on port 80.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <Alert variant="destructive">
-                      <XCircle className="h-4 w-4" />
-                      <AlertTitle>Proxy is not running</AlertTitle>
-                      <AlertDescription>
-                        HTTP proxy service is currently not active.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </>
+                <Alert variant="destructive">
+                  <XCircle className="h-4 w-4" />
+                  <AlertTitle>Proxy is not running</AlertTitle>
+                  <AlertDescription>
+                    HTTP proxy service is currently not active.
+                  </AlertDescription>
+                </Alert>
               )}
             </CardContent>
             <CardFooter>
@@ -119,41 +105,34 @@ export default function HttpProxy() {
             <CardContent className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium mb-2">Active Whitelist Groups</h3>
-                {isLoadingGroups ? (
+                {activeGroups.length > 0 ? (
                   <div className="space-y-2">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
+                    {activeGroups.map((group) => (
+                      <div key={group.id} className="flex items-center justify-between rounded-md border p-3">
+                        <div>
+                          <p className="font-medium">{group.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {group.clients.length} clients, {group.destinations.length} destinations
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link to={`/whitelist/${group.id}`}>
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  activeGroups.length > 0 ? (
-                    <div className="space-y-2">
-                      {activeGroups.map((group) => (
-                        <div key={group.id} className="flex items-center justify-between rounded-md border p-3">
-                          <div>
-                            <p className="font-medium">{group.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {group.clients.length} clients, {group.destinations.length} destinations
-                            </p>
-                          </div>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link to={`/whitelist/${group.id}`}>
-                              <ArrowRight className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-md border border-dashed p-8 text-center">
-                      <h3 className="text-sm font-medium mb-1">No active whitelist groups</h3>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Create and enable whitelist groups to allow proxy access
-                      </p>
-                      <Button asChild>
-                        <Link to="/whitelist/create">Create Whitelist Group</Link>
-                      </Button>
-                    </div>
-                  )
+                  <div className="rounded-md border border-dashed p-8 text-center">
+                    <h3 className="text-sm font-medium mb-1">No active whitelist groups</h3>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Create and enable whitelist groups to allow proxy access
+                    </p>
+                    <Button asChild>
+                      <Link to="/whitelist/create">Create Whitelist Group</Link>
+                    </Button>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -193,7 +172,7 @@ export default function HttpProxy() {
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Port:</span>
-                    <span className="font-mono">80</span>
+                    <span className="font-mono">8080</span>
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Network Mode:</span>
@@ -208,15 +187,15 @@ export default function HttpProxy() {
                 <div className="rounded-md border p-3">
                   <h4 className="text-xs font-medium mb-1">Command Line (curl)</h4>
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                    curl -x http://your-server-ip:80 https://example.com
+                    curl -x http://your-server-ip:8080 https://example.com
                   </pre>
                 </div>
                 
                 <div className="rounded-md border p-3">
                   <h4 className="text-xs font-medium mb-1">Environment Variables</h4>
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                    export HTTP_PROXY=http://your-server-ip:80
-                    export HTTPS_PROXY=http://your-server-ip:80
+                    export HTTP_PROXY=http://your-server-ip:8080
+                    export HTTPS_PROXY=http://your-server-ip:8080
                   </pre>
                 </div>
                 

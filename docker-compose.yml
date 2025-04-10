@@ -1,20 +1,15 @@
 
+version: '3'
+
 services:
-  # Combined container for both web UI and proxy management
+  # Web UI for proxy management
   app:
     build:
       context: .
       dockerfile: app/Dockerfile
-      args:
-        - NPM_FLAGS=--legacy-peer-deps
     network_mode: "host"
     environment:
       - NGINX_CONFIG_PATH=/etc/nginx/nginx.conf
-      - NGINX_TEMPLATE_PATH=/etc/nginx/nginx.conf.template
-      - API_BASE_URL=http://localhost:3001
-      - VITE_API_BASE_URL=/api
-      - API_PORT=3001
-      - VITE_API_PORT=3001
       - AUTH_TYPE=${AUTH_TYPE:-none}
       - LDAP_SERVER=${LDAP_SERVER:-}
       - LDAP_PORT=${LDAP_PORT:-389}
@@ -25,19 +20,24 @@ services:
       - CLIENT_AUTH_REQUIRED=${CLIENT_AUTH_REQUIRED:-false}
       - CLIENT_AUTH_METHOD=${CLIENT_AUTH_METHOD:-none}
       - CLIENT_AUTH_REALM=${CLIENT_AUTH_REALM:-Proxy Access}
-      - SINGLE_CONTAINER=true
-      - APP_USER=node
     volumes:
-      - nginx_config:/etc/nginx:rw
-      - nginx_logs:/var/log/nginx:rw
-      - nginx_certs:/etc/nginx/certs:rw
+      - nginx_config:/etc/nginx
+    depends_on:
+      - nginx-proxy
     restart: unless-stopped
-    command: ["/bin/sh", "-c", "/app/setup-permissions.sh && nginx && /app/start.sh"]
+
+  # Nginx proxy service
+  nginx-proxy:
+    build:
+      context: ./nginx
+    network_mode: "host"
+    volumes:
+      - nginx_config:/etc/nginx
+      - ./nginx/certs:/etc/nginx/certs:ro
+    restart: unless-stopped
 
 networks:
   proxy-network:
 
 volumes:
   nginx_config:
-  nginx_logs:
-  nginx_certs:

@@ -11,10 +11,6 @@ import {
   Shield 
 } from "lucide-react";
 
-interface SidebarProps {
-  sidebarClassName?: string;
-}
-
 const navigation = [
   {
     name: "Dashboard",
@@ -48,11 +44,11 @@ const navigation = [
   },
 ];
 
-export function Sidebar({ sidebarClassName }: SidebarProps) {
+export function Sidebar() {
   const location = useLocation();
 
   return (
-    <aside className={cn("fixed inset-y-0 left-0 z-20 flex-col border-r bg-sidebar md:flex", sidebarClassName)}>
+    <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r bg-sidebar md:flex">
       <div className="flex h-16 items-center gap-2 border-b px-6">
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-primary">
           <Server className="h-4 w-4 text-sidebar-primary-foreground" />
