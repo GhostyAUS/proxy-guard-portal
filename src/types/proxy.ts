@@ -49,6 +49,15 @@ export interface ProxySettings {
     ldapPort?: string;
     useLdaps?: boolean;
   };
+  logsSettings?: {
+    accessLogPath: string;
+    errorLogPath: string;
+    logLevel: 'debug' | 'info' | 'notice' | 'warn' | 'error' | 'crit' | 'alert' | 'emerg';
+    logFormat?: string;
+    rotateLogsDaily: boolean;
+    compressLogs: boolean;
+    maxLogFiles: string;
+  };
 }
 
 export interface NginxStatus {
