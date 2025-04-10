@@ -21,14 +21,14 @@ export interface WhitelistGroup {
 }
 
 export interface ProxySettings {
-  nginxConfigPath: string;
-  isReadOnly: boolean;
-  proxyPort: string; // Combined HTTP/HTTPS port
+  nginxConfigPath?: string;
+  isReadOnly?: boolean;
+  proxyPort?: string; // Combined HTTP/HTTPS port
   httpPort?: string; // HTTP port
   httpsPort?: string; // HTTPS port
   maxUploadSize?: string; // Maximum upload size
   sslCertPath?: string; // Path to SSL certificate
-  authType: 'none' | 'ldap' | 'saml';
+  authType?: 'none' | 'ldap' | 'saml';
   ldapSettings?: {
     serverUrl: string;
     bindDn: string;
@@ -73,4 +73,5 @@ export interface NginxStatus {
   };
   lastModified: string;
   configWritable: boolean;
+  configExists?: boolean; // Added this property
 }

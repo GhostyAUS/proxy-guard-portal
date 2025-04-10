@@ -102,7 +102,7 @@ export default function Dashboard() {
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    {nginxStatus?.isRunning ? (
+                    {(nginxStatus as NginxStatus)?.isRunning ? (
                       <>
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
                         <span className="text-green-500 font-medium">Running</span>
@@ -115,7 +115,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Last modified: {nginxStatus ? new Date(nginxStatus.lastModified).toLocaleString() : 'Unknown'}
+                    Last modified: {nginxStatus ? new Date((nginxStatus as NginxStatus).lastModified).toLocaleString() : 'Unknown'}
                   </p>
                 </>
               )}
@@ -163,7 +163,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
-                {nginxStatus?.isRunning ? (
+                {(nginxStatus as NginxStatus)?.isRunning ? (
                   <>
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
                     <span className="text-green-500 font-medium">Active</span>

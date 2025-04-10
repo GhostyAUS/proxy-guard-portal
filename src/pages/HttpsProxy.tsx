@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { ArrowRight, CheckCircle2, Lock, Shield, XCircle } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
@@ -10,6 +9,7 @@ import { Link } from "react-router-dom";
 import { useNginxStatus } from "@/hooks/useNginxStatus";
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 import { Skeleton } from "@/components/ui/skeleton";
+import { NginxStatus } from "@/types/proxy";
 
 export default function HttpsProxy() {
   const { data: whitelistGroups, isLoading: isLoadingGroups } = useWhitelistGroups();
@@ -42,7 +42,7 @@ export default function HttpsProxy() {
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    {nginxStatus?.isRunning ? (
+                    {(nginxStatus as NginxStatus)?.isRunning ? (
                       <>
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
                         <span className="font-medium text-green-500">Running</span>
@@ -77,7 +77,7 @@ export default function HttpsProxy() {
                     </ul>
                   </div>
                   
-                  {nginxStatus?.isRunning ? (
+                  {(nginxStatus as NginxStatus)?.isRunning ? (
                     <Alert className="bg-green-50 border-green-200">
                       <Shield className="h-4 w-4 text-green-500" />
                       <AlertTitle>Proxy is active</AlertTitle>

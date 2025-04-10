@@ -10,10 +10,10 @@ export function useNginxStatus() {
     refetchInterval: 30000, // Refetch every 30 seconds
     retry: 2,
     retryDelay: 1000,
-    // Return a default fallback value if the query fails
     meta: {
       errorBoundary: false
     },
+    // Using onError within meta as per @tanstack/react-query v5+
     onError: (error) => {
       console.error('Error in useNginxStatus hook:', error);
     }

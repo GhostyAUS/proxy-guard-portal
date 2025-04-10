@@ -40,7 +40,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { testConfigWritable } from "@/utils/nginxUtils";
-import { ProxySettings } from "@/types/proxy";
+import { ProxySettings, NginxStatus } from "@/types/proxy";
 import { useProxySettings } from "@/hooks/useProxySettings";
 import { useNginxStatus } from "@/hooks/useNginxStatus";
 
@@ -92,11 +92,11 @@ export default function Settings() {
                 ) : (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className={`h-3 w-3 rounded-full ${nginxStatus?.isRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      <span>NGINX: {nginxStatus?.isRunning ? 'Running' : 'Stopped'}</span>
+                      <div className={`h-3 w-3 rounded-full ${(nginxStatus as NginxStatus)?.isRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      <span>NGINX: {(nginxStatus as NginxStatus)?.isRunning ? 'Running' : 'Stopped'}</span>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Version: {nginxStatus?.version || 'Unknown'}
+                      Version: {(nginxStatus as NginxStatus)?.version || 'Unknown'}
                     </div>
                   </div>
                 )}
