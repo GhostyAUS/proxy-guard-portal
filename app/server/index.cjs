@@ -59,6 +59,36 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Debug endpoint to list all registered routes
+app.get("/api/debug/routes", (req, res) => {
+  const routes = [];
+  
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      // Routes registered directly on the app
+      routes.push({
+        path: middleware.route.path,
+        methods: Object.keys(middleware.route.methods).join(', ')
+      });
+    } else if (middleware.name === 'router') {
+      // Routes registered on a router
+      middleware.handle.stack.forEach((handler) => {
+        if (handler.route) {
+          routes.push({
+            path: handler.route.path,
+            methods: Object.keys(handler.route.methods).join(', ')
+          });
+        }
+      });
+    }
+  });
+  
+  res.json({
+    routes,
+    totalRoutes: routes.length
+  });
+});
+
 // Forward API routes to nginx service
 app.use("/api/nginx", nginxService);
 
@@ -105,7 +135,7 @@ const whitelistGroups = [
   }
 ];
 
-// GET endpoint for whitelist groups
+// GET endpoint for whitelist groups - FIXED: change path to match what frontend is expecting
 app.get("/api/whitelist-groups", (req, res) => {
   console.log("Whitelist groups requested - returning:", whitelistGroups.length, "groups");
   
@@ -114,7 +144,7 @@ app.get("/api/whitelist-groups", (req, res) => {
     groups: whitelistGroups.map(g => ({ id: g.id, name: g.name })) // Log just id and name to keep logs manageable
   }, null, 2));
   
-  // Important fix: Return proper JSON structure with groups array
+  // IMPORTANT: Return proper JSON structure with groups array
   res.json({ groups: whitelistGroups });
 });
 
@@ -328,6 +358,103 @@ ${destinationsMap}
   }
 });
 
+// New endpoint for toggling group enabled status
+app.patch("/api/whitelist-groups/:id/toggle", (req, res) => {
+  const id = req.params.id;
+  console.log("Received toggle request for whitelist group:", id);
+  
+  const groupIndex = whitelistGroups.findIndex(g => g.id === id);
+  
+  if (groupIndex === -1) {
+    console.error(`Group not found for toggle: ${id}`);
+    return res.status(404).json({ error: "Group not found", success: false });
+  }
+  
+  // Toggle the enabled status
+  whitelistGroups[groupIndex].enabled = !whitelistGroups[groupIndex].enabled;
+  const updatedGroup = whitelistGroups[groupIndex];
+  
+  console.log(`Toggled group ${updatedGroup.name} (${id}) to ${updatedGroup.enabled ? 'enabled' : 'disabled'}`);
+  
+  // Update nginx config
+  try {
+    // Generate NGINX config from whitelist groups (similar to above)
+    const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
+    
+    // Simple implementation of generateNginxConfig
+    const mapBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
+      // Generate the client IPs map
+      const clientIpsMap = group.clients.map(client => 
+        `    ${client.value} 1;`
+      ).join('\n');
+      
+      // Generate the destinations map
+      const destinationsMap = group.destinations.map(dest => 
+        `    ${dest.value} 1;`
+      ).join('\n');
+      
+      return `
+# Group: ${group.name}
+map $remote_addr $client_${group.id} {
+    default 0;
+${clientIpsMap}
+}
+
+map $http_host $dest_${group.id} {
+    default 0;
+${destinationsMap}
+}
+`;
+    }).join('\n');
+    
+    // Generate the access condition for the server block
+    const accessConditions = whitelistGroups.filter(g => g.enabled).map(group => 
+      `        if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
+    ).join('\n');
+    
+    // Replace placeholders in the template
+    let config = nginxConfigTemplate;
+    config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
+    config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
+    
+    console.log("Generated NGINX config after toggle with:");
+    console.log(`- ${whitelistGroups.filter(g => g.enabled).length} enabled groups`);
+    console.log(`- ${accessConditions.split('\n').length} access conditions`);
+    
+    try {
+      // Write the config to a file
+      const configPath = '/etc/nginx/nginx.conf';
+      fs.writeFileSync(configPath, config);
+      console.log("NGINX configuration successfully written to:", configPath);
+      
+      // Reload nginx
+      const { exec } = require('child_process');
+      exec('nginx -s reload', (error, stdout, stderr) => {
+        if (error) {
+          console.error("Error reloading NGINX after toggle:", error);
+          console.error("STDERR:", stderr);
+          
+          // Still return success for the toggle
+          res.json({ success: true, group: updatedGroup, nginxReloaded: false, error: String(error) });
+        } else {
+          console.log("NGINX service successfully reloaded after toggle");
+          console.log("STDOUT:", stdout);
+          
+          res.json({ success: true, group: updatedGroup });
+        }
+      });
+    } catch (configError) {
+      console.error("Error updating/reloading NGINX after toggle:", configError);
+      // Still return success for the toggle
+      res.json({ success: true, group: updatedGroup, nginxUpdated: false, error: String(configError) });
+    }
+  } catch (err) {
+    console.error("Error preparing nginx config after toggle:", err);
+    // Still return success for the toggle
+    res.json({ success: true, group: updatedGroup, nginxUpdated: false, error: String(err) });
+  }
+});
+
 // Serve static files from the dist directory for frontend
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
@@ -361,7 +488,9 @@ try {
     console.log("  - GET /api/whitelist-groups");
     console.log("  - POST /api/whitelist-groups (create/update)");
     console.log("  - DELETE /api/whitelist-groups/:id");
+    console.log("  - PATCH /api/whitelist-groups/:id/toggle");
     console.log("  - Various /api/nginx/* endpoints");
+    console.log("  - GET /api/debug/routes (lists all registered routes)");
     console.log("Current whitelist groups:", whitelistGroups.length);
   });
 } catch (error) {

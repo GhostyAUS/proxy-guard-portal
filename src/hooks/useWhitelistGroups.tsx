@@ -21,6 +21,7 @@ interface WhitelistGroupsContextType {
   removeClientFromGroup: (groupId: string, clientId: string) => Promise<void>;
   removeDestinationFromGroup: (groupId: string, destinationId: string) => Promise<void>;
   fetchGroups: () => Promise<void>;
+  toggleGroupEnabled: (id: string) => Promise<void>;
 }
 
 const WhitelistGroupsContext = createContext<WhitelistGroupsContextType | undefined>(undefined);
@@ -109,6 +110,49 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
 
   useEffect(() => {
     fetchGroups();
+  }, []);
+
+  // New: Toggle group enabled/disabled status
+  const toggleGroupEnabled = useCallback(async (id: string): Promise<void> => {
+    try {
+      setIsLoading(true);
+      console.log("Toggling whitelist group enabled status:", id);
+      
+      // Use the new PATCH endpoint
+      const response = await axios.patch(`${API_BASE_URL}/whitelist-groups/${id}/toggle`, {}, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      }).catch(error => {
+        console.error("API error response:", error.response?.data || error.message);
+        throw error;
+      });
+      
+      console.log("Toggle response:", response.data);
+      
+      if (response.data && response.data.success) {
+        // Update local state with the toggled group
+        const updatedGroup = response.data.group;
+        setGroups(prevGroups => 
+          prevGroups.map(group => group.id === id ? updatedGroup : group)
+        );
+        
+        toast.success(
+          updatedGroup.enabled ? "Group enabled" : "Group disabled", 
+          { description: `${updatedGroup.name} has been ${updatedGroup.enabled ? 'enabled' : 'disabled'}` }
+        );
+      } else {
+        console.error("API returned unsuccessful response:", response.data);
+        throw new Error("Failed to toggle whitelist group status");
+      }
+    } catch (err) {
+      console.error("Error toggling group:", err);
+      toast.error("Failed to update group status");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const addGroup = useCallback(async (group: Omit<WhitelistGroup, "id">): Promise<WhitelistGroup> => {
@@ -365,7 +409,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     addDestinationToGroup,
     removeClientFromGroup,
     removeDestinationFromGroup,
-    fetchGroups
+    fetchGroups,
+    toggleGroupEnabled
   };
 
   return (

@@ -33,7 +33,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 export default function WhitelistGroups() {
   const location = useLocation();
-  const { groups, isLoading, error, addGroup, updateGroup, deleteGroup: removeGroup, fetchGroups } = useWhitelistGroups();
+  const { groups, isLoading, error, addGroup, updateGroup, deleteGroup: removeGroup, fetchGroups, toggleGroupEnabled } = useWhitelistGroups();
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteGroupItem, setDeleteGroupItem] = useState<WhitelistGroup | null>(null);
   const [toggleLoading, setToggleLoading] = useState<string | null>(null);
@@ -69,18 +69,9 @@ export default function WhitelistGroups() {
 
   const handleToggleGroup = async (groupId: string) => {
     try {
-      const group = groups.find(g => g.id === groupId);
-      if (group) {
-        setToggleLoading(groupId);
-        const updatedGroup = { ...group, enabled: !group.enabled };
-        console.log("Toggling group:", groupId, "to", updatedGroup.enabled);
-        await updateGroup(updatedGroup);
-        
-        toast(
-          updatedGroup.enabled ? "Group enabled" : "Group disabled", 
-          { description: `${updatedGroup.name} has been ${updatedGroup.enabled ? 'enabled' : 'disabled'}` }
-        );
-      }
+      setToggleLoading(groupId);
+      console.log("Toggling group:", groupId);
+      await toggleGroupEnabled(groupId);
     } catch (error) {
       console.error("Error toggling group:", error);
       toast.error("Failed to update group status");
@@ -175,6 +166,51 @@ export default function WhitelistGroups() {
                     <pre className="bg-slate-100 dark:bg-slate-900 p-2 rounded text-xs overflow-auto max-h-60">
                       {JSON.stringify(groups, null, 2)}
                     </pre>
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="api-request">
+                  <AccordionTrigger>API Request Test</AccordionTrigger>
+                  <AccordionContent>
+                    <Button 
+                      size="sm" 
+                      onClick={() => {
+                        const apiUrl = `${import.meta.env.VITE_API_BASE_URL || "/api"}/debug/routes`;
+                        toast.info(`Testing API: ${apiUrl}`);
+                        fetch(apiUrl)
+                          .then(res => res.json())
+                          .then(data => {
+                            console.log("API routes:", data);
+                            toast.success(`API responded with ${data.totalRoutes} routes`);
+                          })
+                          .catch(err => {
+                            console.error("API test failed:", err);
+                            toast.error("API test failed");
+                          });
+                      }}
+                      className="mr-2"
+                    >
+                      Test API Routes
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="secondary"
+                      onClick={() => {
+                        const apiUrl = `${import.meta.env.VITE_API_BASE_URL || "/api"}/health`;
+                        toast.info(`Testing API health: ${apiUrl}`);
+                        fetch(apiUrl)
+                          .then(res => res.json())
+                          .then(data => {
+                            console.log("API health:", data);
+                            toast.success("API health check passed");
+                          })
+                          .catch(err => {
+                            console.error("API health check failed:", err);
+                            toast.error("API health check failed");
+                          });
+                      }}
+                    >
+                      Test API Health
+                    </Button>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
