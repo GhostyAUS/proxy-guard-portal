@@ -5,7 +5,8 @@ services:
   # Web UI for proxy management
   app:
     build:
-      context: ./app
+      context: .
+      dockerfile: app/Dockerfile
     ports:
       - "3000:3000"
     environment:
