@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { 
@@ -569,7 +568,7 @@ volumes:
                       <li>
                         Add this file to <code>.gitignore</code> to prevent committing sensitive data:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          echo "variables.env" >> .gitignore
+                          echo "variables.env" {">>"} .gitignore
                         </pre>
                       </li>
                     </ul>
