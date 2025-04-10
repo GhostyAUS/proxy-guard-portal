@@ -1,11 +1,14 @@
 
-FROM node:18-alpine as build
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY . .
+# Copy only package.json and package-lock.json first to leverage Docker cache
+COPY package*.json ./
 RUN npm install
+
+# Now copy the rest of the project files
+COPY . .
 
 # Build the application
 RUN npm run build
@@ -25,3 +28,4 @@ EXPOSE 3000
 
 # Start application
 CMD ["npm", "start"]
+
