@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { 
@@ -396,7 +397,8 @@ map $remote_addr $client_my-group {
                     <h3 className="text-lg font-medium">Docker Deployment</h3>
                     <p>
                       Proxy Guard can be easily deployed using Docker Compose. This allows you to run
-                      the application in a containerized environment with minimal setup.
+                      the application in a containerized environment with minimal setup and direct access
+                      to the host network.
                     </p>
                     
                     <h4 className="text-md font-medium pt-3">Prerequisites</h4>
@@ -506,9 +508,9 @@ services:
   # Web UI for proxy management
   app:
     build:
-      context: ./app
-    ports:
-      - "3000:3000"
+      context: .
+      dockerfile: app/Dockerfile
+    network_mode: "host"
     environment:
       - NGINX_CONFIG_PATH=/etc/nginx/nginx.conf
       - AUTH_TYPE=\${AUTH_TYPE:-none}
@@ -523,8 +525,6 @@ services:
       - CLIENT_AUTH_REALM=\${CLIENT_AUTH_REALM:-Proxy Access}
     volumes:
       - nginx_config:/etc/nginx
-    networks:
-      - proxy-network
     depends_on:
       - nginx-proxy
 
@@ -532,13 +532,10 @@ services:
   nginx-proxy:
     build:
       context: ./nginx
-    ports:
-      - "\${PROXY_PORT:-8080}:8080"
+    network_mode: "host"
     volumes:
       - nginx_config:/etc/nginx
       - ./nginx/certs:/etc/nginx/certs:ro
-    networks:
-      - proxy-network
     restart: unless-stopped
 
 networks:
@@ -578,9 +575,15 @@ volumes:
                       After starting the containers:
                     </p>
                     <ul className="list-disc list-inside space-y-2 pl-4">
-                      <li>Access the management interface: <code>http://localhost:3000</code></li>
+                      <li>Access the management interface: <code>http://localhost:3000</code> (or use your server's IP address)</li>
                       <li>Configure your clients to use the proxy at: <code>http(s)://your-server-ip:8080</code></li>
                     </ul>
+                    
+                    <p className="text-sm text-amber-600 mt-2">
+                      <strong>Note:</strong> Since the services are using host network mode, they will 
+                      be accessible on the host's network interfaces directly. Make sure your firewall
+                      is properly configured if you're exposing this to external networks.
+                    </p>
                     
                     <h4 className="text-md font-medium pt-3">Basic Client Proxy Configuration</h4>
                     <p>

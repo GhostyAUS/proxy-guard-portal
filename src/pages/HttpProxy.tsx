@@ -53,6 +53,10 @@ export default function HttpProxy() {
                     <span className="font-mono">8080</span>
                   </li>
                   <li className="flex justify-between">
+                    <span className="text-muted-foreground">Network Mode:</span>
+                    <span className="font-mono">Host</span>
+                  </li>
+                  <li className="flex justify-between">
                     <span className="text-muted-foreground">DNS Resolver:</span>
                     <span className="font-mono">8.8.8.8</span>
                   </li>
@@ -72,7 +76,7 @@ export default function HttpProxy() {
                   <Server className="h-4 w-4 text-green-500" />
                   <AlertTitle>Proxy is active</AlertTitle>
                   <AlertDescription>
-                    HTTP proxy is running and accepting connections on port 8080.
+                    HTTP proxy is running on host network and accepting connections on port 8080.
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -171,6 +175,10 @@ export default function HttpProxy() {
                     <span className="text-muted-foreground">Port:</span>
                     <span className="font-mono">8080</span>
                   </li>
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Network Mode:</span>
+                    <span className="font-mono">Host</span>
+                  </li>
                 </ul>
               </div>
               
@@ -180,17 +188,23 @@ export default function HttpProxy() {
                 <div className="rounded-md border p-3">
                   <h4 className="text-xs font-medium mb-1">Command Line (curl)</h4>
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                    curl -x http://your-proxy-server:8080 https://example.com
+                    curl -x http://your-server-ip:8080 https://example.com
                   </pre>
                 </div>
                 
                 <div className="rounded-md border p-3">
                   <h4 className="text-xs font-medium mb-1">Environment Variables</h4>
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                    export HTTP_PROXY=http://your-proxy-server:8080
-                    export HTTPS_PROXY=http://your-proxy-server:8080
+                    export HTTP_PROXY=http://your-server-ip:8080
+                    export HTTPS_PROXY=http://your-server-ip:8080
                   </pre>
                 </div>
+                
+                <p className="text-sm text-amber-600 mt-2">
+                  <strong>Note:</strong> Since the proxy is running in host network mode, 
+                  it will use the host's network interfaces directly. You can use either the 
+                  server's IP address or hostname to connect.
+                </p>
               </div>
             </div>
           </CardContent>
