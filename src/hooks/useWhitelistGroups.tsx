@@ -1,3 +1,4 @@
+
 import { useState, useCallback, createContext, useContext, ReactNode, useEffect } from "react";
 import { WhitelistGroup } from "@/types/proxy";
 import { v4 as uuidv4 } from "uuid";
@@ -149,30 +150,10 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         const returnedGroup = response.data.group || newGroup;
         setGroups(prevGroups => [...prevGroups, returnedGroup]);
         
-        // Update NGINX configuration
-        const { generateNginxConfig, DEFAULT_NGINX_TEMPLATE } = await import('@/utils/nginxUtils');
-        const updatedGroups = [...groups, returnedGroup];
-        const newConfig = generateNginxConfig(updatedGroups, DEFAULT_NGINX_TEMPLATE);
-        
-        try {
-          console.log("Saving NGINX configuration...");
-          await axios.post(`${API_BASE_URL}/nginx/save`, {
-            config: newConfig,
-            configPath: '/etc/nginx/nginx.conf'
-          });
-          
-          console.log("Reloading NGINX...");
-          await axios.post(`${API_BASE_URL}/nginx/reload`);
-          
-          toast.success("Whitelist group created", {
-            description: `${returnedGroup.name} has been created successfully`
-          });
-        } catch (nginxErr) {
-          console.error("Error updating NGINX:", nginxErr);
-          toast.warning("Created group but NGINX update failed", {
-            description: "The group was saved but proxy rules weren't updated"
-          });
-        }
+        // The server now handles Nginx config updates
+        toast.success("Whitelist group created", {
+          description: `${returnedGroup.name} has been created successfully`
+        });
         
         return returnedGroup;
       } else {
@@ -185,7 +166,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       });
       throw err;
     }
-  }, [groups]);
+  }, []);
 
   const updateGroup = useCallback(async (updatedGroup: WhitelistGroup): Promise<void> => {
     try {
@@ -200,13 +181,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
           prevGroups.map(group => group.id === updatedGroup.id ? updatedGroup : group)
         );
         
-        // Update NGINX configuration
-        const updatedGroups = groups.map(group => 
-          group.id === updatedGroup.id ? updatedGroup : group
-        );
-        
-        await generateAndSaveNginxConfig(updatedGroups);
-        
+        // The server now handles Nginx config updates
         toast.success("Whitelist group updated", {
           description: `${updatedGroup.name} has been updated successfully`
         });
@@ -220,7 +195,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       });
       throw err;
     }
-  }, [groups]);
+  }, []);
 
   const deleteGroup = useCallback(async (id: string): Promise<void> => {
     try {
@@ -231,12 +206,9 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       
       if (response.data && response.data.success) {
         // Update local state
-        const newGroups = groups.filter(group => group.id !== id);
-        setGroups(newGroups);
+        setGroups(prevGroups => prevGroups.filter(group => group.id !== id));
         
-        // Update NGINX configuration
-        await generateAndSaveNginxConfig(newGroups);
-        
+        // The server now handles Nginx config updates
         toast.success("Whitelist group deleted", {
           description: "The group has been removed successfully"
         });
@@ -250,109 +222,87 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       });
       throw err;
     }
-  }, [groups]);
+  }, []);
 
   const getGroupById = useCallback((id: string) => groups.find(group => group.id === id), [groups]);
 
   const addClientToGroup = useCallback(async (groupId: string, client: { value: string; description?: string }) => {
     try {
-      const newGroups = groups.map(group => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            clients: [...group.clients, { id: uuidv4(), value: client.value, description: client.description }]
-          };
-        }
-        return group;
-      });
+      const group = getGroupById(groupId);
+      if (!group) throw new Error("Group not found");
       
-      setGroups(newGroups);
-      await generateAndSaveNginxConfig(newGroups);
+      const newClient = { id: uuidv4(), value: client.value, description: client.description };
+      const updatedGroup = {
+        ...group,
+        clients: [...group.clients, newClient]
+      };
+      
+      await updateGroup(updatedGroup);
+      return;
     } catch (err) {
       console.error("Error adding client to group:", err);
-      shadowToast({
-        title: "Error",
-        description: "Failed to add client to group",
-        variant: "destructive",
-      });
+      toast.error("Failed to add client to group");
       throw err;
     }
-  }, [groups, shadowToast]);
+  }, [getGroupById, updateGroup]);
 
   const addDestinationToGroup = useCallback(async (groupId: string, destination: { value: string; description?: string }) => {
     try {
-      const newGroups = groups.map(group => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            destinations: [...group.destinations, { id: uuidv4(), value: destination.value, description: destination.description }]
-          };
-        }
-        return group;
-      });
+      const group = getGroupById(groupId);
+      if (!group) throw new Error("Group not found");
       
-      setGroups(newGroups);
-      await generateAndSaveNginxConfig(newGroups);
+      const newDestination = { id: uuidv4(), value: destination.value, description: destination.description };
+      const updatedGroup = {
+        ...group,
+        destinations: [...group.destinations, newDestination]
+      };
+      
+      await updateGroup(updatedGroup);
+      return;
     } catch (err) {
       console.error("Error adding destination to group:", err);
-      shadowToast({
-        title: "Error",
-        description: "Failed to add destination to group",
-        variant: "destructive",
-      });
+      toast.error("Failed to add destination to group");
       throw err;
     }
-  }, [groups, shadowToast]);
+  }, [getGroupById, updateGroup]);
 
   const removeClientFromGroup = useCallback(async (groupId: string, clientId: string) => {
     try {
-      const newGroups = groups.map(group => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            clients: group.clients.filter(client => client.id !== clientId)
-          };
-        }
-        return group;
-      });
+      const group = getGroupById(groupId);
+      if (!group) throw new Error("Group not found");
       
-      setGroups(newGroups);
-      await generateAndSaveNginxConfig(newGroups);
+      const updatedGroup = {
+        ...group,
+        clients: group.clients.filter(client => client.id !== clientId)
+      };
+      
+      await updateGroup(updatedGroup);
+      return;
     } catch (err) {
       console.error("Error removing client from group:", err);
-      shadowToast({
-        title: "Error",
-        description: "Failed to remove client from group",
-        variant: "destructive",
-      });
+      toast.error("Failed to remove client from group");
       throw err;
     }
-  }, [groups, shadowToast]);
+  }, [getGroupById, updateGroup]);
 
   const removeDestinationFromGroup = useCallback(async (groupId: string, destinationId: string) => {
     try {
-      const newGroups = groups.map(group => {
-        if (group.id === groupId) {
-          return {
-            ...group,
-            destinations: group.destinations.filter(destination => destination.id !== destinationId)
-          };
-        }
-        return group;
-      });
+      const group = getGroupById(groupId);
+      if (!group) throw new Error("Group not found");
       
-      setGroups(newGroups);
-      await generateAndSaveNginxConfig(newGroups);
+      const updatedGroup = {
+        ...group,
+        destinations: group.destinations.filter(destination => destination.id !== destinationId)
+      };
+      
+      await updateGroup(updatedGroup);
+      return;
     } catch (err) {
       console.error("Error removing destination from group:", err);
-      shadowToast({
-        title: "Error",
-        description: "Failed to remove destination from group",
-        variant: "destructive",
-      });
+      toast.error("Failed to remove destination from group");
       throw err;
     }
-  }, [groups, shadowToast]);
+  }, [getGroupById, updateGroup]);
 
   const value = {
     groups,

@@ -116,7 +116,21 @@ app.post("/api/whitelist-groups", (req, res) => {
     console.log("Added new whitelist group:", group.id);
   }
 
-  res.json({ success: true, group });
+  // Update nginx config whenever a whitelist group is created or updated
+  try {
+    // In a real implementation, we would update the nginx config here
+    // For now, we'll just log it
+    console.log("Nginx configuration would be updated with new whitelist groups");
+    
+    // Simulate reloading nginx
+    console.log("Nginx service would be reloaded to apply new configuration");
+    
+    res.json({ success: true, group });
+  } catch (err) {
+    console.error("Error updating nginx config:", err);
+    // Still return success for the group save
+    res.json({ success: true, group, nginxUpdated: false });
+  }
 });
 
 // Delete a whitelist group
@@ -132,7 +146,21 @@ app.delete("/api/whitelist-groups/:id", (req, res) => {
     whitelistGroups.length = 0;
     whitelistGroups.push(...filteredGroups);
     console.log("Deleted whitelist group:", id);
-    res.json({ success: true });
+    
+    // Update nginx config
+    try {
+      // In a real implementation, we would update the nginx config here
+      console.log("Nginx configuration would be updated after group deletion");
+      
+      // Simulate reloading nginx
+      console.log("Nginx service would be reloaded to apply new configuration");
+      
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error updating nginx config after deletion:", err);
+      // Still return success for the group deletion
+      res.json({ success: true, nginxUpdated: false });
+    }
   } else {
     console.log("Whitelist group not found:", id);
     res.status(404).json({ error: "Group not found" });

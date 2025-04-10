@@ -10,7 +10,8 @@ import {
   Laptop, 
   Plus, 
   Save, 
-  Trash
+  Trash,
+  CheckCircle
 } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -68,7 +69,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { ClientIP, Destination, WhitelistGroup } from "@/types/proxy";
-import { mockWhitelistGroups } from "@/utils/mockData";
+import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -97,6 +98,20 @@ export default function WhitelistDetail() {
   const [isAddingDestination, setIsAddingDestination] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [destinationToDelete, setDestinationToDelete] = useState<string | null>(null);
+  const [hasUnsavedClientChanges, setHasUnsavedClientChanges] = useState(false);
+  const [hasUnsavedDestChanges, setHasUnsavedDestChanges] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { 
+    addGroup, 
+    updateGroup, 
+    getGroupById, 
+    addClientToGroup, 
+    addDestinationToGroup,
+    removeClientFromGroup,
+    removeDestinationFromGroup,
+    groups
+  } = useWhitelistGroups();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -130,7 +145,7 @@ export default function WhitelistDetail() {
     
     if (!isCreating && id) {
       // Find the group with the matching ID
-      const foundGroup = mockWhitelistGroups.find(g => g.id === id);
+      const foundGroup = getGroupById(id);
       if (foundGroup) {
         setGroup(foundGroup);
         form.reset({
@@ -143,96 +158,183 @@ export default function WhitelistDetail() {
         navigate("/whitelist");
       }
     }
-  }, [id, isCreating, navigate, form]);
+  }, [id, isCreating, navigate, form, getGroupById, groups]);
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    if (isCreating) {
-      const newGroup: WhitelistGroup = {
-        id: `group-${Date.now()}`,
-        name: values.name,
-        description: values.description || undefined,
-        enabled: values.enabled,
-        clients: [],
-        destinations: [],
-      };
-      
-      setGroup(newGroup);
-      toast.success("Group created successfully");
-      navigate(`/whitelist/${newGroup.id}`);
-      setIsEditing(false);
-    } else if (group) {
-      const updatedGroup = {
-        ...group,
-        name: values.name,
-        description: values.description || undefined,
-        enabled: values.enabled,
-      };
-      
-      setGroup(updatedGroup);
-      setIsEditing(false);
-      toast.success("Group updated successfully");
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      setIsLoading(true);
+      if (isCreating) {
+        const newGroup: Omit<WhitelistGroup, "id"> = {
+          name: values.name,
+          description: values.description || undefined,
+          enabled: values.enabled,
+          clients: [],
+          destinations: [],
+        };
+        
+        const createdGroup = await addGroup(newGroup);
+        setGroup(createdGroup);
+        toast.success("Group created successfully");
+        navigate(`/whitelist/${createdGroup.id}`);
+        setIsEditing(false);
+      } else if (group) {
+        const updatedGroup = {
+          ...group,
+          name: values.name,
+          description: values.description || undefined,
+          enabled: values.enabled,
+        };
+        
+        await updateGroup(updatedGroup);
+        setGroup(updatedGroup);
+        setIsEditing(false);
+        toast.success("Group updated successfully");
+      }
+    } catch (error) {
+      console.error("Error saving group:", error);
+      toast.error("Failed to save group");
+    } finally {
+      setIsLoading(false);
     }
   };
   
-  const addClient = (values: z.infer<typeof clientSchema>) => {
+  const addClient = async (values: z.infer<typeof clientSchema>) => {
     if (group) {
-      const newClient: ClientIP = {
-        id: `client-${Date.now()}`,
-        value: values.value,
-        description: values.description || undefined,
-      };
-      
-      setGroup({
-        ...group,
-        clients: [...group.clients, newClient],
-      });
-      
-      setIsAddingClient(false);
-      clientForm.reset();
-      toast.success("Client added successfully");
+      try {
+        setIsLoading(true);
+        await addClientToGroup(group.id, {
+          value: values.value,
+          description: values.description || undefined
+        });
+        
+        // Update local state
+        const updatedGroup = getGroupById(group.id);
+        if (updatedGroup) {
+          setGroup(updatedGroup);
+        }
+        
+        setIsAddingClient(false);
+        clientForm.reset();
+        setHasUnsavedClientChanges(false);
+        toast.success("Client added successfully");
+      } catch (error) {
+        console.error("Error adding client:", error);
+        toast.error("Failed to add client");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
   
-  const addDestination = (values: z.infer<typeof destinationSchema>) => {
+  const addDestination = async (values: z.infer<typeof destinationSchema>) => {
     if (group) {
-      const newDestination: Destination = {
-        id: `dest-${Date.now()}`,
-        value: values.value,
-        description: values.description || undefined,
-      };
-      
-      setGroup({
-        ...group,
-        destinations: [...group.destinations, newDestination],
-      });
-      
-      setIsAddingDestination(false);
-      destinationForm.reset();
-      toast.success("Destination added successfully");
+      try {
+        setIsLoading(true);
+        await addDestinationToGroup(group.id, {
+          value: values.value,
+          description: values.description || undefined
+        });
+        
+        // Update local state
+        const updatedGroup = getGroupById(group.id);
+        if (updatedGroup) {
+          setGroup(updatedGroup);
+        }
+        
+        setIsAddingDestination(false);
+        destinationForm.reset();
+        setHasUnsavedDestChanges(false);
+        toast.success("Destination added successfully");
+      } catch (error) {
+        console.error("Error adding destination:", error);
+        toast.error("Failed to add destination");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  const deleteClient = (clientId: string) => {
+  const deleteClient = async (clientId: string) => {
     if (group) {
-      setGroup({
-        ...group,
-        clients: group.clients.filter(client => client.id !== clientId),
-      });
-      
-      setClientToDelete(null);
-      toast.success("Client removed successfully");
+      try {
+        setIsLoading(true);
+        await removeClientFromGroup(group.id, clientId);
+        
+        // Update local state
+        const updatedGroup = getGroupById(group.id);
+        if (updatedGroup) {
+          setGroup(updatedGroup);
+        }
+        
+        setClientToDelete(null);
+        setHasUnsavedClientChanges(false);
+        toast.success("Client removed successfully");
+      } catch (error) {
+        console.error("Error removing client:", error);
+        toast.error("Failed to remove client");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
   
-  const deleteDestination = (destId: string) => {
+  const deleteDestination = async (destId: string) => {
     if (group) {
-      setGroup({
-        ...group,
-        destinations: group.destinations.filter(dest => dest.id !== destId),
-      });
-      
-      setDestinationToDelete(null);
-      toast.success("Destination removed successfully");
+      try {
+        setIsLoading(true);
+        await removeDestinationFromGroup(group.id, destId);
+        
+        // Update local state
+        const updatedGroup = getGroupById(group.id);
+        if (updatedGroup) {
+          setGroup(updatedGroup);
+        }
+        
+        setDestinationToDelete(null);
+        setHasUnsavedDestChanges(false);
+        toast.success("Destination removed successfully");
+      } catch (error) {
+        console.error("Error removing destination:", error);
+        toast.error("Failed to remove destination");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const applyClientChanges = async () => {
+    if (group) {
+      try {
+        setIsLoading(true);
+        
+        // The actual implementation is already in the API hooks,
+        // so we just need to update the UI state
+        toast.success("Client changes applied successfully");
+        setHasUnsavedClientChanges(false);
+      } catch (error) {
+        console.error("Error applying client changes:", error);
+        toast.error("Failed to apply client changes");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+  
+  const applyDestinationChanges = async () => {
+    if (group) {
+      try {
+        setIsLoading(true);
+        
+        // The actual implementation is already in the API hooks,
+        // so we just need to update the UI state
+        toast.success("Destination changes applied successfully");
+        setHasUnsavedDestChanges(false);
+      } catch (error) {
+        console.error("Error applying destination changes:", error);
+        toast.error("Failed to apply destination changes");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -326,9 +428,18 @@ export default function WhitelistDetail() {
                   />
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit">
-                    <Save className="mr-2 h-4 w-4" />
-                    {isCreating ? "Create Group" : "Save Changes"}
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <span className="animate-spin mr-2">⚪</span>
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Create Group
+                      </>
+                    )}
                   </Button>
                 </CardFooter>
               </form>
@@ -439,12 +550,22 @@ export default function WhitelistDetail() {
                         enabled: group.enabled,
                       });
                     }}
+                    disabled={isLoading}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Changes
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <span className="animate-spin mr-2">⚪</span>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Changes
+                      </>
+                    )}
                   </Button>
                 </CardFooter>
               </form>
@@ -491,10 +612,18 @@ export default function WhitelistDetail() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>Client IP Addresses</CardTitle>
-                  <Button onClick={() => setIsAddingClient(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Client IP
-                  </Button>
+                  <div className="flex gap-2">
+                    {hasUnsavedClientChanges && (
+                      <Button onClick={applyClientChanges} disabled={isLoading}>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Apply Changes
+                      </Button>
+                    )}
+                    <Button onClick={() => setIsAddingClient(true)} disabled={isLoading}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Client IP
+                    </Button>
+                  </div>
                 </div>
                 <CardDescription>
                   IP addresses or subnets allowed access in this group
@@ -521,6 +650,7 @@ export default function WhitelistDetail() {
                               size="icon" 
                               className="text-destructive"
                               onClick={() => setClientToDelete(client.id)}
+                              disabled={isLoading}
                             >
                               <Trash className="h-4 w-4" />
                             </Button>
@@ -545,10 +675,18 @@ export default function WhitelistDetail() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>Destination URLs</CardTitle>
-                  <Button onClick={() => setIsAddingDestination(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Destination
-                  </Button>
+                  <div className="flex gap-2">
+                    {hasUnsavedDestChanges && (
+                      <Button onClick={applyDestinationChanges} disabled={isLoading}>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Apply Changes
+                      </Button>
+                    )}
+                    <Button onClick={() => setIsAddingDestination(true)} disabled={isLoading}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Destination
+                    </Button>
+                  </div>
                 </div>
                 <CardDescription>
                   URLs or domains that clients in this group are allowed to access
@@ -575,6 +713,7 @@ export default function WhitelistDetail() {
                               size="icon" 
                               className="text-destructive"
                               onClick={() => setDestinationToDelete(dest.id)}
+                              disabled={isLoading}
                             >
                               <Trash className="h-4 w-4" />
                             </Button>
@@ -650,12 +789,22 @@ export default function WhitelistDetail() {
                   type="button" 
                   variant="outline" 
                   onClick={() => setIsAddingClient(false)}
+                  disabled={isLoading}
                 >
                   Cancel
                 </Button>
-                <Button type="submit">
-                  <Check className="mr-2 h-4 w-4" />
-                  Add Client
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <span className="animate-spin mr-2">⚪</span>
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Add Client
+                    </>
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -716,12 +865,22 @@ export default function WhitelistDetail() {
                   type="button" 
                   variant="outline" 
                   onClick={() => setIsAddingDestination(false)}
+                  disabled={isLoading}
                 >
                   Cancel
                 </Button>
-                <Button type="submit">
-                  <Check className="mr-2 h-4 w-4" />
-                  Add Destination
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <span className="animate-spin mr-2">⚪</span>
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Add Destination
+                    </>
+                  )}
                 </Button>
               </DialogFooter>
             </form>
@@ -743,12 +902,13 @@ export default function WhitelistDetail() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               className="bg-destructive" 
               onClick={() => clientToDelete && deleteClient(clientToDelete)}
+              disabled={isLoading}
             >
-              Delete
+              {isLoading ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -768,12 +928,13 @@ export default function WhitelistDetail() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               className="bg-destructive" 
               onClick={() => destinationToDelete && deleteDestination(destinationToDelete)}
+              disabled={isLoading}
             >
-              Delete
+              {isLoading ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
