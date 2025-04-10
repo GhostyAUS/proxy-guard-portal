@@ -4,12 +4,10 @@ FROM node:18-alpine as build
 WORKDIR /app
 
 # Copy package files and install dependencies
-COPY package*.json ./
-# Using npm install instead of npm ci since package-lock.json might not be available
+COPY . .
 RUN npm install
 
-# Copy source files and build the application
-COPY . .
+# Build the application
 RUN npm run build
 
 # Production stage
