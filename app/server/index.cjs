@@ -52,6 +52,8 @@ app.use((req, res, next) => {
 // Basic health check endpoint
 app.get("/api/health", (req, res) => {
   console.log("Health check requested");
+  // IMPORTANT: Set proper content-type header
+  res.setHeader('Content-Type', 'application/json');
   res.json({ 
     status: "ok", 
     timestamp: new Date(),
@@ -83,6 +85,8 @@ app.get("/api/debug/routes", (req, res) => {
     }
   });
   
+  // IMPORTANT: Set proper content-type header
+  res.setHeader('Content-Type', 'application/json');
   res.json({
     routes,
     totalRoutes: routes.length
@@ -139,7 +143,7 @@ const whitelistGroups = [
 app.get("/api/whitelist-groups", (req, res) => {
   console.log("Whitelist groups requested - returning:", whitelistGroups.length, "groups");
   
-  // Set proper content-type header to ensure browser doesn't interpret as HTML
+  // IMPORTANT: Set proper content-type header to ensure browser doesn't interpret as HTML
   res.setHeader('Content-Type', 'application/json');
   
   // Log the structure of what we're returning

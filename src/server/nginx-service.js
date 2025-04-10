@@ -1,4 +1,3 @@
-
 /**
  * NGINX operations service for the Proxy Guard application
  */
@@ -27,6 +26,9 @@ const execPromise = (command) => {
 // Get NGINX status
 router.get('/nginx/status', async (req, res) => {
   try {
+    // Set proper Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     // Check if nginx is running
     let isRunning = false;
     try {
@@ -109,6 +111,9 @@ router.get('/nginx/status', async (req, res) => {
 // Get current NGINX configuration
 router.get('/nginx/config', (req, res) => {
   try {
+    // Set proper Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
     console.log(`Reading nginx config from: ${configPath}`);
     
@@ -137,6 +142,9 @@ router.get('/nginx/config', (req, res) => {
 // Validate NGINX config syntax
 router.post('/nginx/validate', async (req, res) => {
   try {
+    // Set proper Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     const { config, configPath = '/etc/nginx/nginx.conf' } = req.body;
     console.log(`Validating nginx config, length: ${config?.length || 0}`);
     
@@ -411,6 +419,9 @@ router.get('/logs', (req, res) => {
 // Get whitelist groups from NGINX config
 router.get('/whitelist-groups', (req, res) => {
   try {
+    // Set proper Content-Type header
+    res.setHeader('Content-Type', 'application/json');
+    
     console.log('Getting whitelist groups from nginx config');
     const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
     

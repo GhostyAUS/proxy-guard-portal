@@ -41,6 +41,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       
       const timestamp = new Date().getTime();
       
+      // Modified to use explicit Accept header and handle text/html responses
       const response = await axios.get(`${API_BASE_URL}/whitelist-groups?t=${timestamp}`, {
         headers: {
           'Accept': 'application/json',
@@ -49,35 +50,48 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
           'Pragma': 'no-cache',
           'Expires': '0'
         },
+        responseType: 'text', // First get as text to check if it's HTML
         validateStatus: status => true
       });
       
       console.log("Whitelist groups response status:", response.status);
-      console.log("Whitelist groups response data:", response.data);
+      
+      // Check if response appears to be HTML
+      const responseText = response.data;
+      const isHtml = typeof responseText === 'string' && responseText.trim().startsWith('<!DOCTYPE html>');
+      
+      if (isHtml) {
+        console.log("API returned HTML instead of JSON");
+        throw new Error("Invalid API response format. Server returned HTML instead of JSON.");
+      }
+      
+      // Now parse as JSON if it's not HTML
+      let responseData;
+      try {
+        responseData = typeof responseText === 'string' ? JSON.parse(responseText) : responseText;
+        console.log("Whitelist groups response data:", responseData);
+      } catch (e) {
+        console.error("Failed to parse response as JSON:", e);
+        throw new Error("Invalid JSON response from API");
+      }
       
       if (response.status >= 400) {
         throw new Error(`API returned error status: ${response.status}`);
       }
       
-      // Check if the response is HTML instead of JSON
-      if (typeof response.data === 'string' && response.data.trim().startsWith('<!DOCTYPE html>')) {
-        console.error("API returned HTML instead of JSON");
-        throw new Error("Invalid API response format. Server returned HTML instead of JSON.");
-      }
-      
       let groupsData: WhitelistGroup[] = [];
       
-      if (response.data && Array.isArray(response.data.groups)) {
-        groupsData = response.data.groups;
+      if (responseData && Array.isArray(responseData.groups)) {
+        groupsData = responseData.groups;
         console.log(`Successfully loaded ${groupsData.length} groups from API`);
-      } else if (response.data && Array.isArray(response.data)) {
-        groupsData = response.data;
+      } else if (responseData && Array.isArray(responseData)) {
+        groupsData = responseData;
         console.log(`Successfully loaded ${groupsData.length} groups from direct array`);
-      } else if (response.data && typeof response.data === 'object') {
-        for (const key in response.data) {
-          if (Array.isArray(response.data[key])) {
+      } else if (responseData && typeof responseData === 'object') {
+        for (const key in responseData) {
+          if (Array.isArray(responseData[key])) {
             console.log(`Found array in response.data.${key}, using as groups`);
-            groupsData = response.data[key];
+            groupsData = responseData[key];
             break;
           }
         }
@@ -102,7 +116,29 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         description: "Could not retrieve groups from the server. Please try again."
       });
       
-      setGroups([]);
+      // Use mock data in development environment as fallback
+      if (import.meta.env.DEV) {
+        const mockGroups: WhitelistGroup[] = [
+          {
+            id: "mock-group-1",
+            name: "Development Mock Group",
+            description: "This is a mock group for development",
+            clients: [
+              { id: "mock-client-1", value: "192.168.1.1", description: "Mock Client 1" },
+              { id: "mock-client-2", value: "10.0.0.0/24", description: "Mock Network" }
+            ],
+            destinations: [
+              { id: "mock-dest-1", value: "example.com", description: "Example Site" },
+              { id: "mock-dest-2", value: "*.google.com", description: "Google Sites" }
+            ],
+            enabled: true
+          }
+        ];
+        console.log("Using mock data for development:", mockGroups);
+        setGroups(mockGroups);
+      } else {
+        setGroups([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +156,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache'
-        }
+        },
+        responseType: 'json'
       });
 
       if (!templateResponse.data || !templateResponse.data.config) {
