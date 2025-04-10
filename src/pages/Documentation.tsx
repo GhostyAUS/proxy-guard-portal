@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { 
@@ -423,7 +424,7 @@ map $remote_addr $client_my-group {
 ├── app/
 │   ├── Dockerfile
 │   └── [application files]
-├── .env
+├── variables.env
 └── README.md`}
                     </pre>
                     
@@ -441,7 +442,7 @@ map $remote_addr $client_my-group {
                     
                     <h4 className="text-md font-medium pt-3">Step 2: Configure Environment Variables</h4>
                     <p>
-                      Create or edit the <code>.env</code> file to set your configuration:
+                      Create a <code>variables.env</code> file to set your configuration:
                     </p>
                     <pre className="bg-muted p-2 rounded-md text-sm mt-1">
 {`# Proxy settings
@@ -489,10 +490,10 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
                     
                     <h4 className="text-md font-medium pt-3">Step 4: Start the Services</h4>
                     <p>
-                      Launch Proxy Guard using Docker Compose:
+                      Launch Proxy Guard using Docker Compose with your environment file:
                     </p>
                     <pre className="bg-muted p-2 rounded-md text-sm mt-1">
-                      docker-compose up -d
+                      docker-compose --env-file variables.env up -d
                     </pre>
                     
                     <h4 className="text-md font-medium pt-3">Docker Compose File</h4>
@@ -511,6 +512,16 @@ services:
       - "3000:3000"
     environment:
       - NGINX_CONFIG_PATH=/etc/nginx/nginx.conf
+      - AUTH_TYPE=\${AUTH_TYPE:-none}
+      - LDAP_SERVER=\${LDAP_SERVER:-}
+      - LDAP_PORT=\${LDAP_PORT:-389}
+      - LDAP_USE_SSL=\${LDAP_USE_SSL:-false}
+      - LDAP_BIND_DN=\${LDAP_BIND_DN:-}
+      - LDAP_SEARCH_BASE=\${LDAP_SEARCH_BASE:-}
+      - LDAP_SEARCH_FILTER=\${LDAP_SEARCH_FILTER:-}
+      - CLIENT_AUTH_REQUIRED=\${CLIENT_AUTH_REQUIRED:-false}
+      - CLIENT_AUTH_METHOD=\${CLIENT_AUTH_METHOD:-none}
+      - CLIENT_AUTH_REALM=\${CLIENT_AUTH_REALM:-Proxy Access}
     volumes:
       - nginx_config:/etc/nginx
     networks:
@@ -537,6 +548,31 @@ networks:
 volumes:
   nginx_config:`}
                     </pre>
+                    
+                    <h4 className="text-md font-medium pt-3">Using a Custom Environment File</h4>
+                    <p>
+                      For better organization and security, you can:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 pl-4">
+                      <li>
+                        Use the <code>--env-file</code> flag to specify your environment file:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+                          docker-compose --env-file variables.env up -d
+                        </pre>
+                      </li>
+                      <li>
+                        Or modify the docker-compose command to use a different file:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+                          docker-compose --env-file /path/to/custom/variables.env up -d
+                        </pre>
+                      </li>
+                      <li>
+                        Add this file to <code>.gitignore</code> to prevent committing sensitive data:
+                        <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
+                          echo "variables.env" >> .gitignore
+                        </pre>
+                      </li>
+                    </ul>
                     
                     <h4 className="text-md font-medium pt-3">Accessing the Application</h4>
                     <p>
@@ -586,7 +622,7 @@ $env:https_proxy = "http://your-server-ip:8080"`}
                       <li>
                         Restart after configuration changes:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          docker-compose restart
+                          docker-compose --env-file variables.env restart
                         </pre>
                       </li>
                     </ul>
