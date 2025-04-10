@@ -8,5 +8,14 @@ export function useNginxStatus() {
     queryKey: ['nginxStatus'],
     queryFn: fetchNginxStatus,
     refetchInterval: 30000, // Refetch every 30 seconds
+    retry: 2,
+    retryDelay: 1000,
+    // Return a default fallback value if the query fails
+    meta: {
+      errorBoundary: false
+    },
+    onError: (error) => {
+      console.error('Error in useNginxStatus hook:', error);
+    }
   });
 }

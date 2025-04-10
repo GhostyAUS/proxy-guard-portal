@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -8,7 +9,8 @@ import {
   Server, 
   Shield,
   XCircle,
-  Upload
+  Upload,
+  Code
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
@@ -16,46 +18,38 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 import { toast } from "sonner";
-import axios from "axios";
+import { useNginxStatus } from "@/hooks/useNginxStatus";
+import { fetchApiRoutes } from "@/services/apiService";
 import { NginxStatus } from "@/types/proxy";
 
 export default function Dashboard() {
-  const [nginxStatus, setNginxStatus] = useState<NginxStatus>({
-    isRunning: false,
-    lastConfigTest: {
-      success: false,
-      message: "Status unknown"
-    },
-    lastModified: new Date().toISOString(),
-    configWritable: false
-  });
-  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  const [apiRoutes, setApiRoutes] = useState<string[]>([]);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(true);
   
   const { groups, isLoading, error, fetchGroups, commitChanges } = useWhitelistGroups();
+  const { data: nginxStatus, isLoading: isLoadingStatus } = useNginxStatus();
   
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";
     
-    const fetchNginxStatus = async () => {
+    const fetchRoutes = async () => {
       try {
-        setIsLoadingStatus(true);
-        const response = await axios.get('/api/nginx/status');
-        if (response.data) {
-          setNginxStatus(response.data);
-        }
+        setIsLoadingRoutes(true);
+        const routes = await fetchApiRoutes();
+        setApiRoutes(Array.isArray(routes) ? routes : []);
       } catch (err) {
-        console.error("Error fetching nginx status:", err);
+        console.error("Error fetching API routes:", err);
+        setApiRoutes([]);
       } finally {
-        setIsLoadingStatus(false);
+        setIsLoadingRoutes(false);
       }
     };
     
-    fetchNginxStatus();
+    fetchRoutes();
   }, []);
 
-  const activeGroups = Array.isArray(groups) 
-    ? groups.filter(group => group.enabled).length 
-    : 0;
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  const activeGroups = safeGroups.filter(group => group && group.enabled).length;
 
   const handleCommitChanges = async () => {
     const success = await commitChanges();
@@ -87,9 +81,9 @@ export default function Dashboard() {
               <ListFilter className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{Array.isArray(groups) ? groups.length : 0}</div>
+              <div className="text-2xl font-bold">{safeGroups.length}</div>
               <p className="text-xs text-muted-foreground">
-                {activeGroups} active, {(Array.isArray(groups) ? groups.length : 0) - activeGroups} inactive
+                {activeGroups} active, {safeGroups.length - activeGroups} inactive
               </p>
             </CardContent>
           </Card>
@@ -108,7 +102,7 @@ export default function Dashboard() {
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    {nginxStatus.isRunning ? (
+                    {nginxStatus?.isRunning ? (
                       <>
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
                         <span className="text-green-500 font-medium">Running</span>
@@ -121,7 +115,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Last modified: {new Date(nginxStatus.lastModified).toLocaleString()}
+                    Last modified: {nginxStatus ? new Date(nginxStatus.lastModified).toLocaleString() : 'Unknown'}
                   </p>
                 </>
               )}
@@ -130,32 +124,59 @@ export default function Dashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">HTTP Proxy</CardTitle>
-              <Globe className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">API Routes</CardTitle>
+              <Code className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className="text-green-500 font-medium">Active</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Port 8080
-              </p>
+              {isLoadingRoutes ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                  <span className="text-muted-foreground">Loading...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    {apiRoutes.length > 0 ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="text-green-500 font-medium">Available</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-destructive font-medium">Not detected</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {apiRoutes.length} routes found
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">HTTPS Proxy</CardTitle>
+              <CardTitle className="text-sm font-medium">Proxy Status</CardTitle>
               <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className="text-green-500 font-medium">Active</span>
+                {nginxStatus?.isRunning ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span className="text-green-500 font-medium">Active</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 text-destructive" />
+                    <span className="text-destructive font-medium">Inactive</span>
+                  </>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Port 8443
+                HTTP/HTTPS proxy services
               </p>
             </CardContent>
           </Card>

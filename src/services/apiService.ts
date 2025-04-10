@@ -14,6 +14,8 @@ const api = axios.create({
 export async function fetchWhitelistGroups(): Promise<WhitelistGroup[]> {
   try {
     const response = await api.get('/whitelist/groups');
+    console.log("API response for whitelist groups:", response.data);
+    
     // Handle both array response and { groups: [...] } structure
     if (Array.isArray(response.data)) {
       return response.data;
@@ -25,17 +27,30 @@ export async function fetchWhitelistGroups(): Promise<WhitelistGroup[]> {
     return [];
   } catch (error) {
     console.error('Error fetching whitelist groups:', error);
-    throw error;
+    // Return empty array instead of throwing to prevent UI crashes
+    return [];
   }
 }
 
 export async function fetchNginxStatus(): Promise<NginxStatus> {
   try {
+    console.log("Fetching nginx status from:", `${API_BASE_URL}/nginx/status`);
     const response = await api.get('/nginx/status');
+    console.log("Nginx status response:", response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching Nginx status:', error);
-    throw error;
+    // Return default status with isRunning: false instead of throwing
+    return {
+      isRunning: false,
+      lastModified: new Date().toISOString(),
+      lastConfigTest: {
+        success: false,
+        message: 'Failed to fetch status'
+      },
+      configWritable: false,
+      configExists: false
+    };
   }
 }
 
@@ -45,7 +60,25 @@ export async function fetchProxySettings(): Promise<ProxySettings> {
     return response.data;
   } catch (error) {
     console.error('Error fetching proxy settings:', error);
-    throw error;
+    // Return default settings instead of throwing
+    return {
+      httpPort: 8080,
+      httpsPort: 8443,
+      maxUploadSize: "10m",
+      sslCertPath: "/etc/nginx/certs/server.crt"
+    };
+  }
+}
+
+export async function fetchApiRoutes() {
+  try {
+    console.log("Fetching API routes from:", `${API_BASE_URL}/debug/routes`);
+    const response = await api.get('/debug/routes');
+    console.log("API routes response:", response.data);
+    return response.data.routes || [];
+  } catch (error) {
+    console.error('Error fetching API routes:', error);
+    return [];
   }
 }
 
