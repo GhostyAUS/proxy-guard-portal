@@ -447,7 +447,7 @@ map $remote_addr $client_my-group {
                     </p>
                     <pre className="bg-muted p-2 rounded-md text-sm mt-1">
 {`# Proxy settings
-PROXY_PORT=8080
+PROXY_PORT=80
 NGINX_CONFIG_PATH=/etc/nginx/nginx.conf
 
 # Authentication settings
@@ -494,7 +494,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
                       Launch Proxy Guard using Docker Compose with your environment file:
                     </p>
                     <pre className="bg-muted p-2 rounded-md text-sm mt-1">
-                      docker-compose --env-file variables.env up -d
+                      docker compose --env-file variables.env up -d
                     </pre>
                     
                     <h4 className="text-md font-medium pt-3">Docker Compose File</h4>
@@ -592,13 +592,13 @@ nano variables.env`}
                         Rebuild and restart the containers with the latest code:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
 {`# Stop existing containers
-docker-compose down
+docker compose down
 
 # Rebuild images with no-cache to ensure latest dependencies
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # Start the updated containers
-docker-compose --env-file variables.env up -d`}
+docker compose --env-file variables.env up -d`}
                         </pre>
                       </li>
                       
@@ -606,10 +606,10 @@ docker-compose --env-file variables.env up -d`}
                         Verify the upgrade:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
 {`# Check container status
-docker-compose ps
+docker compose ps
 
 # Check logs for any errors
-docker-compose logs -f`}
+docker compose logs -f`}
                         </pre>
                       </li>
                     </ol>
@@ -622,7 +622,7 @@ docker-compose logs -f`}
                       <li>
                         Stop the current containers:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          docker-compose down
+                          docker compose down
                         </pre>
                       </li>
                       
@@ -651,8 +651,8 @@ docker run --rm -v proxy-guard_nginx_config:/data -v $(pwd):/backup alpine sh -c
                       <li>
                         Rebuild and restart with the previous version:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-{`docker-compose build
-docker-compose --env-file variables.env up -d`}
+{`docker compose build
+docker compose --env-file variables.env up -d`}
                         </pre>
                       </li>
                     </ol>
@@ -665,13 +665,13 @@ docker-compose --env-file variables.env up -d`}
                       <li>
                         Use the <code>--env-file</code> flag to specify your environment file:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          docker-compose --env-file variables.env up -d
+                          docker compose --env-file variables.env up -d
                         </pre>
                       </li>
                       <li>
                         Or modify the docker-compose command to use a different file:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          docker-compose --env-file /path/to/custom/variables.env up -d
+                          docker compose --env-file /path/to/custom/variables.env up -d
                         </pre>
                       </li>
                       <li>
@@ -688,7 +688,7 @@ docker-compose --env-file variables.env up -d`}
                     </p>
                     <ul className="list-disc list-inside space-y-2 pl-4">
                       <li>Access the management interface: <code>http://localhost:3000</code> (or use your server's IP address)</li>
-                      <li>Configure your clients to use the proxy at: <code>http(s)://your-server-ip:8080</code></li>
+                      <li>Configure your clients to use the proxy at: <code>http(s)://your-server-ip:80</code></li>
                     </ul>
                     
                     <p className="text-sm text-amber-600 mt-2">
@@ -703,20 +703,20 @@ docker-compose --env-file variables.env up -d`}
                     </p>
                     <pre className="bg-muted p-2 rounded-md text-sm mt-1">
 {`# Linux/macOS environment variables
-export http_proxy=http://your-server-ip:8080
-export https_proxy=http://your-server-ip:8080
+export http_proxy=http://your-server-ip:80
+export https_proxy=http://your-server-ip:80
 
 # With authentication (if enabled)
-export http_proxy=http://username:password@your-server-ip:8080
-export https_proxy=http://username:password@your-server-ip:8080
+export http_proxy=http://username:password@your-server-ip:80
+export https_proxy=http://username:password@your-server-ip:80
 
 # For Windows CMD
-set http_proxy=http://your-server-ip:8080
-set https_proxy=http://your-server-ip:8080
+set http_proxy=http://your-server-ip:80
+set https_proxy=http://your-server-ip:80
 
 # For PowerShell
-$env:http_proxy = "http://your-server-ip:8080"
-$env:https_proxy = "http://your-server-ip:8080"`}
+$env:http_proxy = "http://your-server-ip:80"
+$env:https_proxy = "http://your-server-ip:80"`}
                     </pre>
                     
                     <h4 className="text-md font-medium pt-3">Managing the Docker Environment</h4>
@@ -724,19 +724,19 @@ $env:https_proxy = "http://your-server-ip:8080"`}
                       <li>
                         Stop the services:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          docker-compose down
+                          docker compose down
                         </pre>
                       </li>
                       <li>
                         View logs:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          docker-compose logs -f
+                          docker compose logs -f
                         </pre>
                       </li>
                       <li>
                         Restart after configuration changes:
                         <pre className="bg-muted p-2 rounded-md text-sm mt-1 ml-4">
-                          docker-compose --env-file variables.env restart
+                          docker compose --env-file variables.env restart
                         </pre>
                       </li>
                     </ul>
