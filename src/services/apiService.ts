@@ -14,7 +14,15 @@ const api = axios.create({
 export async function fetchWhitelistGroups(): Promise<WhitelistGroup[]> {
   try {
     const response = await api.get('/whitelist/groups');
-    return response.data;
+    // Handle both array response and { groups: [...] } structure
+    if (Array.isArray(response.data)) {
+      return response.data;
+    } else if (response.data && Array.isArray(response.data.groups)) {
+      return response.data.groups;
+    }
+    // If neither format is valid, return empty array
+    console.warn('Unexpected response format from API:', response.data);
+    return [];
   } catch (error) {
     console.error('Error fetching whitelist groups:', error);
     throw error;

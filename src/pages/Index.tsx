@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -37,7 +36,6 @@ export default function Dashboard() {
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";
     
-    // Fetch real nginx status from API
     const fetchNginxStatus = async () => {
       try {
         setIsLoadingStatus(true);
@@ -55,7 +53,6 @@ export default function Dashboard() {
     fetchNginxStatus();
   }, []);
 
-  // Make sure groups is treated as an array with a fallback to empty array
   const activeGroups = Array.isArray(groups) 
     ? groups.filter(group => group.enabled).length 
     : 0;
@@ -63,7 +60,7 @@ export default function Dashboard() {
   const handleCommitChanges = async () => {
     const success = await commitChanges();
     if (success) {
-      fetchGroups(); // Refresh groups after commit
+      fetchGroups();
     }
   };
   
@@ -90,9 +87,9 @@ export default function Dashboard() {
               <ListFilter className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{groups?.length || 0}</div>
+              <div className="text-2xl font-bold">{Array.isArray(groups) ? groups.length : 0}</div>
               <p className="text-xs text-muted-foreground">
-                {activeGroups} active, {(groups?.length || 0) - activeGroups} inactive
+                {activeGroups} active, {(Array.isArray(groups) ? groups.length : 0) - activeGroups} inactive
               </p>
             </CardContent>
           </Card>
@@ -217,25 +214,25 @@ export default function Dashboard() {
               <Card key={group.id} className="overflow-hidden">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>{group.name}</CardTitle>
+                    <CardTitle>{group.name || "Unnamed Group"}</CardTitle>
                     <Badge variant={group.enabled ? "default" : "outline"}>
                       {group.enabled ? "Enabled" : "Disabled"}
                     </Badge>
                   </div>
-                  <CardDescription>{group.description}</CardDescription>
+                  <CardDescription>{group.description || "No description"}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-2">
                     <div>
                       <h3 className="text-sm font-medium">Clients</h3>
                       <p className="text-sm text-muted-foreground">
-                        {group.clients?.length || 0} IPs/Subnets
+                        {Array.isArray(group.clients) ? group.clients.length : 0} IPs/Subnets
                       </p>
                     </div>
                     <div>
                       <h3 className="text-sm font-medium">Destinations</h3>
                       <p className="text-sm text-muted-foreground">
-                        {group.destinations?.length || 0} URLs/Domains
+                        {Array.isArray(group.destinations) ? group.destinations.length : 0} URLs/Domains
                       </p>
                     </div>
                   </div>

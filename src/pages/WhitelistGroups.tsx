@@ -160,10 +160,13 @@ export default function WhitelistGroups() {
   };
 
   const filteredGroups = Array.isArray(groups) 
-    ? groups.filter(group => 
-        group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
-      ) 
+    ? groups.filter(group => {
+        const name = group.name || "";
+        const description = group.description || "";
+        const query = searchQuery.toLowerCase();
+        
+        return name.toLowerCase().includes(query) || description.toLowerCase().includes(query);
+      }) 
     : [];
 
   const handleCreateDemoGroup = async () => {

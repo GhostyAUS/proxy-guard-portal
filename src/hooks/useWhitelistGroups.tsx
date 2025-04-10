@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useCallback, useState, useEffect, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchWhitelistGroups } from '@/services/apiService';
@@ -11,7 +10,6 @@ interface WhitelistGroupsContextType {
   isLoading: boolean;
   error: unknown;
   refetch: () => Promise<void>;
-  // Add these missing properties
   groups: WhitelistGroup[];
   fetchGroups: () => Promise<void>;
   commitChanges: () => Promise<boolean>;
@@ -32,7 +30,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  // Initialize groups as an empty array to avoid the filter is not a function error
   const [groups, setGroups] = useState<WhitelistGroup[]>([]);
   
   const { data, isLoading, error, refetch: tanstackRefetch } = useQuery<WhitelistGroup[]>({
@@ -41,9 +38,16 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    // Ensure data is an array before setting it to groups
     if (data && Array.isArray(data)) {
-      setGroups(data);
+      const safeData = data.map(group => ({
+        ...group,
+        name: group.name || "",
+        description: group.description || "",
+        clients: Array.isArray(group.clients) ? group.clients : [],
+        destinations: Array.isArray(group.destinations) ? group.destinations : [],
+        enabled: typeof group.enabled === 'boolean' ? group.enabled : false
+      }));
+      setGroups(safeData);
     }
   }, [data]);
 
@@ -63,7 +67,6 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
 
   const commitChanges = useCallback(async () => {
     try {
-      // In a real application, this would call an API to commit changes
       await axios.post(`${API_BASE_URL}/whitelist/apply`);
       toast.success("Changes applied successfully");
       return true;
@@ -76,13 +79,31 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
 
   const addGroup = useCallback(async (group: Omit<WhitelistGroup, "id">) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/whitelist/groups`, group);
+      console.log("Adding group:", group);
+      const safeGroup = {
+        ...group,
+        name: group.name || "",
+        description: group.description || "",
+        clients: Array.isArray(group.clients) ? group.clients : [],
+        destinations: Array.isArray(group.destinations) ? group.destinations : [],
+        enabled: typeof group.enabled === 'boolean' ? group.enabled : false
+      };
+      
+      const response = await axios.post(`${API_BASE_URL}/whitelist/groups`, safeGroup);
       const newGroup = response.data;
       
-      // Update local state
-      setGroups(prevGroups => [...prevGroups, newGroup]);
+      const safeNewGroup = {
+        ...newGroup,
+        name: newGroup.name || "",
+        description: newGroup.description || "",
+        clients: Array.isArray(newGroup.clients) ? newGroup.clients : [],
+        destinations: Array.isArray(newGroup.destinations) ? newGroup.destinations : [],
+        enabled: typeof newGroup.enabled === 'boolean' ? newGroup.enabled : false
+      };
       
-      return newGroup;
+      setGroups(prevGroups => [...prevGroups, safeNewGroup]);
+      
+      return safeNewGroup;
     } catch (error) {
       console.error("Error adding group:", error);
       throw error;
@@ -93,7 +114,6 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       await axios.put(`${API_BASE_URL}/whitelist/groups/${group.id}`, group);
       
-      // Update local state
       setGroups(prevGroups => 
         prevGroups.map(g => g.id === group.id ? group : g)
       );
@@ -107,7 +127,6 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       await axios.delete(`${API_BASE_URL}/whitelist/groups/${id}`);
       
-      // Update local state
       setGroups(prevGroups => prevGroups.filter(g => g.id !== id));
     } catch (error) {
       console.error("Error deleting group:", error);
@@ -136,13 +155,12 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       const response = await axios.post(`${API_BASE_URL}/whitelist/groups/${groupId}/clients`, client);
       
-      // Update local state
       setGroups(prevGroups => 
         prevGroups.map(group => {
           if (group.id === groupId) {
             return {
               ...group,
-              clients: [...(group.clients || []), response.data]
+              clients: [...(Array.isArray(group.clients) ? group.clients : []), response.data]
             };
           }
           return group;
@@ -158,13 +176,12 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       const response = await axios.post(`${API_BASE_URL}/whitelist/groups/${groupId}/destinations`, destination);
       
-      // Update local state
       setGroups(prevGroups => 
         prevGroups.map(group => {
           if (group.id === groupId) {
             return {
               ...group,
-              destinations: [...(group.destinations || []), response.data]
+              destinations: [...(Array.isArray(group.destinations) ? group.destinations : []), response.data]
             };
           }
           return group;
@@ -180,13 +197,12 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       await axios.delete(`${API_BASE_URL}/whitelist/groups/${groupId}/clients/${clientId}`);
       
-      // Update local state
       setGroups(prevGroups => 
         prevGroups.map(group => {
           if (group.id === groupId) {
             return {
               ...group,
-              clients: (group.clients || []).filter(client => client.id !== clientId)
+              clients: (Array.isArray(group.clients) ? group.clients : []).filter(client => client.id !== clientId)
             };
           }
           return group;
@@ -202,13 +218,12 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
     try {
       await axios.delete(`${API_BASE_URL}/whitelist/groups/${groupId}/destinations/${destinationId}`);
       
-      // Update local state
       setGroups(prevGroups => 
         prevGroups.map(group => {
           if (group.id === groupId) {
             return {
               ...group,
-              destinations: (group.destinations || []).filter(dest => dest.id !== destinationId)
+              destinations: (Array.isArray(group.destinations) ? group.destinations : []).filter(dest => dest.id !== destinationId)
             };
           }
           return group;
@@ -226,7 +241,7 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
         data, 
         isLoading, 
         error, 
-        refetch,
+        refetch: fetchGroups,
         groups,
         fetchGroups,
         commitChanges,
