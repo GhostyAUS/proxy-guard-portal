@@ -18,9 +18,6 @@ import { WhitelistGroupsProvider } from "./hooks/useWhitelistGroups";
 
 // Set up API base URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-if (!API_BASE_URL) {
-  console.warn("API_BASE_URL is not set. Using default /api path.");
-}
 
 const queryClient = new QueryClient();
 

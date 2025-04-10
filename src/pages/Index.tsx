@@ -13,18 +13,46 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
-import { mockNginxStatus } from "@/utils/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 import { toast } from "sonner";
+import axios from "axios";
+import { NginxStatus } from "@/types/proxy";
 
 export default function Dashboard() {
-  const [nginxStatus] = useState(mockNginxStatus);
+  const [nginxStatus, setNginxStatus] = useState<NginxStatus>({
+    isRunning: false,
+    lastConfigTest: {
+      success: false,
+      message: "Status unknown"
+    },
+    lastModified: new Date().toISOString(),
+    configWritable: false
+  });
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  
   const { groups: whitelistGroups, isLoading, error, fetchGroups, commitChanges } = useWhitelistGroups();
   
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";
+    
+    // Fetch real nginx status from API
+    const fetchNginxStatus = async () => {
+      try {
+        setIsLoadingStatus(true);
+        const response = await axios.get('/api/nginx/status');
+        if (response.data) {
+          setNginxStatus(response.data);
+        }
+      } catch (err) {
+        console.error("Error fetching nginx status:", err);
+      } finally {
+        setIsLoadingStatus(false);
+      }
+    };
+    
+    fetchNginxStatus();
   }, []);
 
   const activeGroups = whitelistGroups.filter(group => group.enabled).length;
@@ -72,22 +100,31 @@ export default function Dashboard() {
               <Server className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                {nginxStatus.isRunning ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-green-500 font-medium">Running</span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-4 w-4 text-destructive" />
-                    <span className="text-destructive font-medium">Stopped</span>
-                  </>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Last modified: {new Date(nginxStatus.lastModified).toLocaleString()}
-              </p>
+              {isLoadingStatus ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                  <span className="text-muted-foreground">Loading...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    {nginxStatus.isRunning ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="text-green-500 font-medium">Running</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-destructive font-medium">Stopped</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last modified: {new Date(nginxStatus.lastModified).toLocaleString()}
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
 

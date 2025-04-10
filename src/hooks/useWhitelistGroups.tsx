@@ -1,4 +1,3 @@
-
 import { useState, useCallback, createContext, useContext, ReactNode, useEffect } from "react";
 import { WhitelistGroup } from "@/types/proxy";
 import { v4 as uuidv4 } from "uuid";
@@ -116,29 +115,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         description: "Could not retrieve groups from the server. Please try again."
       });
       
-      // Use mock data in development environment as fallback
-      if (import.meta.env.DEV) {
-        const mockGroups: WhitelistGroup[] = [
-          {
-            id: "mock-group-1",
-            name: "Development Mock Group",
-            description: "This is a mock group for development",
-            clients: [
-              { id: "mock-client-1", value: "192.168.1.1", description: "Mock Client 1" },
-              { id: "mock-client-2", value: "10.0.0.0/24", description: "Mock Network" }
-            ],
-            destinations: [
-              { id: "mock-dest-1", value: "example.com", description: "Example Site" },
-              { id: "mock-dest-2", value: "*.google.com", description: "Google Sites" }
-            ],
-            enabled: true
-          }
-        ];
-        console.log("Using mock data for development:", mockGroups);
-        setGroups(mockGroups);
-      } else {
-        setGroups([]);
-      }
+      // Remove development fallback
+      setGroups([]);
     } finally {
       setIsLoading(false);
     }
@@ -267,7 +245,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     }
   }, [groups]);
 
-  // Fix the addGroup function to ensure new group is immediately available for client/destination additions
   const addGroup = useCallback(async (group: Omit<WhitelistGroup, "id">): Promise<WhitelistGroup> => {
     try {
       setIsLoading(true);
@@ -432,7 +409,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     }
   }, []);
 
-  // Fix getGroupById to better handle undefined cases and add debugging
   const getGroupById = useCallback((id: string) => {
     const group = groups.find(group => group.id === id);
     if (!group) {
@@ -441,7 +417,6 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     return group;
   }, [groups]);
 
-  // Fix addClient to handle not found cases gracefully
   const addClient = useCallback(async (groupId: string, client: { value: string; description?: string }): Promise<void> => {
     try {
       setIsLoading(true);

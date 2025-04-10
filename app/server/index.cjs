@@ -1,4 +1,3 @@
-
 // Server file with CommonJS syntax
 const express = require("express");
 const app = express();
@@ -57,11 +56,11 @@ app.get("/api/health", (req, res) => {
   res.json({ 
     status: "ok", 
     timestamp: new Date(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'production'
   });
 });
 
-// Debug endpoint to list all registered routes
+// Debug endpoint to list all registered routes - keep in production for troubleshooting
 app.get("/api/debug/routes", (req, res) => {
   const routes = [];
   
@@ -96,7 +95,7 @@ app.get("/api/debug/routes", (req, res) => {
 // Forward API routes to nginx service
 app.use("/api/nginx", nginxService);
 
-// Whitelist groups storage (in-memory for development)
+// Whitelist groups storage (in-memory for production)
 const whitelistGroups = [
   {
     id: "group-1",
@@ -423,17 +422,8 @@ app.use((err, req, res, next) => {
 try {
   app.listen(PORT, () => {
     console.log(`API Server running on port ${PORT}`);
-    console.log(`Server environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Server environment: ${process.env.NODE_ENV || 'production'}`);
     console.log(`Server time: ${new Date().toISOString()}`);
-    console.log("Server endpoints:");
-    console.log("  - GET /api/health");
-    console.log("  - GET /api/whitelist-groups");
-    console.log("  - POST /api/whitelist-groups (create/update)");
-    console.log("  - DELETE /api/whitelist-groups/:id");
-    console.log("  - PATCH /api/whitelist-groups/:id/toggle");
-    console.log("  - Various /api/nginx/* endpoints");
-    console.log("  - GET /api/debug/routes (lists all registered routes)");
-    console.log("Current whitelist groups:", whitelistGroups?.length || 0);
   });
 } catch (error) {
   console.error("Failed to start API server:", error);
