@@ -44,24 +44,29 @@ export const mockLogStats: LogStats = {
   totalRequests: mockLogs.length,
   allowedRequests: mockLogs.filter(log => log.status === 'allowed').length,
   deniedRequests: mockLogs.filter(log => log.status === 'denied').length,
-  topClients: countTopItems(mockLogs.map(log => log.clientIp), 5),
-  topDestinations: countTopItems(mockLogs.map(log => log.destination), 5),
+  topClients: countTopItems(mockLogs, 'clientIp', 5),
+  topDestinations: countTopItems(mockLogs, 'destination', 5),
   lastUpdated: new Date().toISOString()
 };
 
 // Helper function to count occurrences and get top items
-function countTopItems(items: string[], limit: number) {
+function countTopItems(logs: LogEntry[], property: 'clientIp' | 'destination', limit: number) {
   const counts: Record<string, number> = {};
   
-  items.forEach(item => {
-    counts[item] = (counts[item] || 0) + 1;
+  logs.forEach(log => {
+    const value = log[property];
+    counts[value] = (counts[value] || 0) + 1;
   });
   
-  return Object.entries(counts)
-    .map(([item, count]) => ({ 
-      [item.includes('clientIp') ? 'clientIp' : 'destination']: item, 
-      count 
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit);
+  if (property === 'clientIp') {
+    return Object.entries(counts)
+      .map(([clientIp, count]) => ({ clientIp, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+  } else {
+    return Object.entries(counts)
+      .map(([destination, count]) => ({ destination, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+  }
 }
