@@ -1,6 +1,6 @@
 
 console.log("Starting API server from pre-created file");
-const express = require("express");
+import express from "express";
 const app = express();
 const PORT = process.env.API_PORT || 3001;
 
@@ -38,10 +38,15 @@ app.use((err, req, res, next) => {
 });
 
 // Start server with more extensive logging
-app.listen(PORT, () => {
-  console.log(`API Server running on port ${PORT}`);
-  console.log(`Server environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Server time: ${new Date().toISOString()}`);
-  console.log("Server endpoints:");
-  console.log("  - GET /api/health");
-});
+try {
+  app.listen(PORT, () => {
+    console.log(`API Server running on port ${PORT}`);
+    console.log(`Server environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Server time: ${new Date().toISOString()}`);
+    console.log("Server endpoints:");
+    console.log("  - GET /api/health");
+  });
+} catch (error) {
+  console.error("Failed to start API server:", error);
+  process.exit(1);
+}
