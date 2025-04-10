@@ -11,6 +11,34 @@ const api = axios.create({
   },
 });
 
+// Add request interceptor for debugging
+api.interceptors.request.use(
+  (config) => {
+    console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    return config;
+  },
+  (error) => {
+    console.error('API Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor for debugging
+api.interceptors.response.use(
+  (response) => {
+    console.log(`API Response from ${response.config.url}: Status ${response.status}`);
+    return response;
+  },
+  (error) => {
+    console.error('API Response Error:', error);
+    if (error.response) {
+      console.error('Error Status:', error.response.status);
+      console.error('Error Data:', error.response.data);
+    }
+    return Promise.reject(error);
+  }
+);
+
 export async function fetchWhitelistGroups(): Promise<WhitelistGroup[]> {
   try {
     const response = await api.get('/whitelist/groups');

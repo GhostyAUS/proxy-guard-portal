@@ -1,6 +1,6 @@
 
 services:
-  # Web UI for proxy management
+  # Combined container for both web UI and proxy management
   app:
     build:
       context: .
@@ -24,23 +24,13 @@ services:
       - CLIENT_AUTH_REQUIRED=${CLIENT_AUTH_REQUIRED:-false}
       - CLIENT_AUTH_METHOD=${CLIENT_AUTH_METHOD:-none}
       - CLIENT_AUTH_REALM=${CLIENT_AUTH_REALM:-Proxy Access}
+      - SINGLE_CONTAINER=true
     volumes:
       - nginx_config:/etc/nginx:rw
       - nginx_logs:/var/log/nginx:rw
-    depends_on:
-      - nginx-proxy
+      - nginx_certs:/etc/nginx/certs:rw
     restart: unless-stopped
-
-  # Nginx proxy service
-  nginx-proxy:
-    build:
-      context: ./nginx
-    network_mode: "host"
-    volumes:
-      - nginx_config:/etc/nginx:rw
-      - nginx_logs:/var/log/nginx:rw
-      - nginx_certs:/etc/nginx/certs:rw  # Changed to rw so certificates can be created
-    restart: unless-stopped
+    command: ["/bin/sh", "-c", "nginx && /app/start.sh"]
 
 networks:
   proxy-network:
@@ -48,4 +38,4 @@ networks:
 volumes:
   nginx_config:
   nginx_logs:
-  nginx_certs:  # Added new volume for certificates
+  nginx_certs:
