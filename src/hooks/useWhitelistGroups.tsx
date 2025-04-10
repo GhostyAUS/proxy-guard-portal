@@ -32,19 +32,23 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
 
   const fetchGroups = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       console.log("Fetching whitelist groups from API...");
       const response = await axios.get(`${API_BASE_URL}/whitelist-groups`);
       console.log("Whitelist groups response:", response.data);
-      setGroups(response.data.groups || []);
-      setError(null);
+      
+      if (response.data && Array.isArray(response.data.groups)) {
+        setGroups(response.data.groups);
+      } else {
+        console.warn("API response format unexpected:", response.data);
+        setGroups([]);
+      }
     } catch (err) {
       console.error("Error fetching whitelist groups:", err);
       setError("Failed to fetch whitelist groups");
-      shadowToast({
-        title: "Error",
-        description: "Failed to fetch whitelist groups",
-        variant: "destructive",
+      toast.error("Failed to load whitelist groups", {
+        description: "Could not retrieve groups from the server"
       });
       
       // Fallback to mock data if API fails
@@ -86,11 +90,14 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       toast.success("NGINX configuration updated", {
         description: "Changes have been applied successfully"
       });
+      
+      return true;
     } catch (err) {
       console.error("Error updating NGINX configuration:", err);
       toast.error("Failed to update NGINX configuration", {
         description: "Check server logs for details"
       });
+      return false;
     }
   };
 
@@ -101,62 +108,100 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         id: uuidv4(),
       };
       
-      const newGroups = [...groups, newGroup];
-      setGroups(newGroups);
+      console.log("Adding new whitelist group:", newGroup);
       
-      // Update NGINX configuration
-      await generateAndSaveNginxConfig(newGroups);
+      // Send to API
+      const response = await axios.post(`${API_BASE_URL}/whitelist-groups`, newGroup);
       
-      return newGroup;
+      if (response.data && response.data.success) {
+        // Update local state with the returned group or the one we created
+        const returnedGroup = response.data.group || newGroup;
+        setGroups(prevGroups => [...prevGroups, returnedGroup]);
+        
+        // Update NGINX configuration
+        await generateAndSaveNginxConfig([...groups, returnedGroup]);
+        
+        toast.success("Whitelist group created", {
+          description: `${returnedGroup.name} has been created successfully`
+        });
+        
+        return returnedGroup;
+      } else {
+        throw new Error("Failed to save whitelist group");
+      }
     } catch (err) {
       console.error("Error adding group:", err);
-      shadowToast({
-        title: "Error",
-        description: "Failed to add whitelist group",
-        variant: "destructive",
+      toast.error("Failed to create whitelist group", {
+        description: "Could not save the group to the server"
       });
       throw err;
     }
-  }, [groups, shadowToast]);
+  }, [groups]);
 
   const updateGroup = useCallback(async (updatedGroup: WhitelistGroup): Promise<void> => {
     try {
-      const newGroups = groups.map(group => 
-        group.id === updatedGroup.id ? updatedGroup : group
-      );
+      console.log("Updating whitelist group:", updatedGroup);
       
-      setGroups(newGroups);
+      // Send to API
+      const response = await axios.post(`${API_BASE_URL}/whitelist-groups`, updatedGroup);
       
-      // Update NGINX configuration
-      await generateAndSaveNginxConfig(newGroups);
+      if (response.data && response.data.success) {
+        // Update local state
+        setGroups(prevGroups => 
+          prevGroups.map(group => group.id === updatedGroup.id ? updatedGroup : group)
+        );
+        
+        // Update NGINX configuration
+        const updatedGroups = groups.map(group => 
+          group.id === updatedGroup.id ? updatedGroup : group
+        );
+        
+        await generateAndSaveNginxConfig(updatedGroups);
+        
+        toast.success("Whitelist group updated", {
+          description: `${updatedGroup.name} has been updated successfully`
+        });
+      } else {
+        throw new Error("Failed to update whitelist group");
+      }
     } catch (err) {
       console.error("Error updating group:", err);
-      shadowToast({
-        title: "Error",
-        description: "Failed to update whitelist group",
-        variant: "destructive",
+      toast.error("Failed to update whitelist group", {
+        description: "Could not save the changes to the server"
       });
       throw err;
     }
-  }, [groups, shadowToast]);
+  }, [groups]);
 
   const deleteGroup = useCallback(async (id: string): Promise<void> => {
     try {
-      const newGroups = groups.filter(group => group.id !== id);
-      setGroups(newGroups);
+      console.log("Deleting whitelist group:", id);
       
-      // Update NGINX configuration
-      await generateAndSaveNginxConfig(newGroups);
+      // Send to API
+      const response = await axios.delete(`${API_BASE_URL}/whitelist-groups/${id}`);
+      
+      if (response.data && response.data.success) {
+        // Update local state
+        const newGroups = groups.filter(group => group.id !== id);
+        setGroups(newGroups);
+        
+        // Update NGINX configuration
+        await generateAndSaveNginxConfig(newGroups);
+        
+        toast.success("Whitelist group deleted", {
+          description: "The group has been removed successfully"
+        });
+      } else {
+        throw new Error("Failed to delete whitelist group");
+      }
     } catch (err) {
       console.error("Error deleting group:", err);
-      shadowToast({
-        title: "Error",
-        description: "Failed to delete whitelist group",
-        variant: "destructive",
+      toast.error("Failed to delete whitelist group", {
+        description: "Could not remove the group from the server"
       });
       throw err;
     }
-  }, [groups, shadowToast]);
+  }, [groups]);
 
   const getGroupById = useCallback((id: string) => groups.find(group => group.id === id), [groups]);
 
