@@ -1,3 +1,4 @@
+
 import { WhitelistGroup } from "@/types/proxy";
 import axios from "axios";
 
@@ -25,6 +26,7 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
       `    ${dest.value} 1;`
     ).join('\n');
     
+    // Make sure each map directive has proper formatting with variable, value pairs
     return `
 # Group: ${group.name}
 map $remote_addr $client_${group.id} {

@@ -1,3 +1,4 @@
+
 // Server file with CommonJS syntax
 const express = require("express");
 const app = express();
@@ -147,7 +148,7 @@ app.get("/api/whitelist-groups", (req, res) => {
   res.json({ groups: whitelistGroups });
 });
 
-// Create or update a whitelist group
+// Function to update Nginx configuration based on whitelist groups
 const updateNginxConfig = () => {
   try {
     // Generate NGINX config from whitelist groups
@@ -166,6 +167,7 @@ const updateNginxConfig = () => {
         `    ${dest.value} 1;`
       ).join('\n');
       
+      // Make sure to return properly formatted map directives
       return `
 # Group: ${group.name}
 map $remote_addr $client_${group.id} {
