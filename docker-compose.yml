@@ -1,6 +1,4 @@
 
-version: '3'
-
 services:
   # Web UI for proxy management
   app:
@@ -50,4 +48,3 @@ networks:
 volumes:
   nginx_config:
   nginx_logs:
-

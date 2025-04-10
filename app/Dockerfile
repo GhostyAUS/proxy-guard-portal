@@ -81,6 +81,12 @@ node server/index.js &\n\
 npm start\n'\
 > /app/start.sh && chmod +x /app/start.sh
 
+# Ensure the script is executable
+RUN chmod +x /app/start.sh
+
+# Display the script to verify its contents
+RUN cat /app/start.sh
+
 # Expose port
 EXPOSE 3000
 EXPOSE 3001
