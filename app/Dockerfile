@@ -58,19 +58,19 @@ COPY --from=build /app/src/server ./server 2>/dev/null || echo "Server directory
 # Create a minimal server file if it doesn't exist
 RUN mkdir -p /app/server
 RUN if [ ! -f "/app/server/index.js" ]; then \
-      echo "console.log('Creating minimal API server');\n\
-const express = require('express');\n\
-const app = express();\n\
-const PORT = process.env.API_PORT || 3001;\n\
-\n\
-app.use(express.json());\n\
-\n\
-app.get('/api/health', (req, res) => {\n\
-  res.json({ status: 'ok', timestamp: new Date() });\n\
-});\n\
-\n\
-app.listen(PORT, () => {\n\
-  console.log(`API Server running on port ${PORT}`);\n\
+      echo "console.log('Creating minimal API server');\
+const express = require('express');\
+const app = express();\
+const PORT = process.env.API_PORT || 3001;\
+\
+app.use(express.json());\
+\
+app.get('/api/health', (req, res) => {\
+  res.json({ status: 'ok', timestamp: new Date() });\
+});\
+\
+app.listen(PORT, () => {\
+  console.log(\`API Server running on port \${PORT}\`);\
 });" > /app/server/index.js; \
     fi
 
