@@ -60,7 +60,6 @@ export default function Settings() {
     }
   }, [proxySettings, settings]);
 
-  // Add a return statement with the JSX content for the Settings component
   return (
     <Layout>
       <div className="space-y-6">
@@ -124,7 +123,7 @@ export default function Settings() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">HTTP Port</label>
-                        <Input type="number" value={settings?.httpPort || 8080} readOnly />
+                        <Input type="number" value={settings?.httpPort || '8080'} readOnly />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Max Upload Size</label>
@@ -154,7 +153,7 @@ export default function Settings() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">HTTPS Port</label>
-                        <Input type="number" value={settings?.httpsPort || 8443} readOnly />
+                        <Input type="number" value={settings?.httpsPort || '8443'} readOnly />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">SSL Certificate Path</label>

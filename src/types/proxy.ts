@@ -24,6 +24,10 @@ export interface ProxySettings {
   nginxConfigPath: string;
   isReadOnly: boolean;
   proxyPort: string; // Combined HTTP/HTTPS port
+  httpPort?: string; // HTTP port
+  httpsPort?: string; // HTTPS port
+  maxUploadSize?: string; // Maximum upload size
+  sslCertPath?: string; // Path to SSL certificate
   authType: 'none' | 'ldap' | 'saml';
   ldapSettings?: {
     serverUrl: string;
@@ -62,6 +66,7 @@ export interface ProxySettings {
 
 export interface NginxStatus {
   isRunning: boolean;
+  version?: string; // NGINX version
   lastConfigTest: {
     success: boolean;
     message: string;
