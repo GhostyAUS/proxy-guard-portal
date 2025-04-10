@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowUpDown, Edit, Plus, Trash, RefreshCw, AlertCircle, Bug, Code, Server } from "lucide-react";
@@ -31,7 +30,7 @@ import {
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import axios from "axios";
-import { v4 as uuidv4 } from "uuid"; // Explicitly import uuid
+import { v4 as uuidv4 } from "uuid";
 
 export default function WhitelistGroups() {
   const location = useLocation();
@@ -47,23 +46,19 @@ export default function WhitelistGroups() {
   useEffect(() => {
     document.title = "Whitelist Groups | Proxy Guard";
     
-    // Check if we have a new group from state navigation
     if (location.state?.newGroup) {
       const newGroup = location.state.newGroup;
       addGroup(newGroup);
       toast.success("Group created", { description: `${newGroup.name} has been created successfully` });
       
-      // Clear the location state
       window.history.replaceState({}, document.title);
     }
     
-    // Check if we have updated group info from state navigation
     if (location.state?.updatedGroup) {
       const updatedGroup = location.state.updatedGroup;
       updateGroup(updatedGroup);
       toast.success("Group updated", { description: `${updatedGroup.name} has been updated successfully` });
       
-      // Clear the location state
       window.history.replaceState({}, document.title);
     }
   }, [location.state, addGroup, updateGroup]);
@@ -117,7 +112,6 @@ export default function WhitelistGroups() {
   const toggleDebugMode = () => {
     setIsDebugMode(!isDebugMode);
     
-    // If enabling debug mode, fetch API routes
     if (!isDebugMode) {
       fetchApiRoutes();
     }
@@ -165,10 +159,12 @@ export default function WhitelistGroups() {
     }
   };
 
-  const filteredGroups = groups?.filter(group => 
-    group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  ) || [];
+  const filteredGroups = Array.isArray(groups) 
+    ? groups.filter(group => 
+        group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      ) 
+    : [];
 
   const handleCreateDemoGroup = async () => {
     try {
@@ -511,7 +507,7 @@ export default function WhitelistGroups() {
           </CardContent>
           {filteredGroups.length > 0 && (
             <CardFooter className="text-sm text-muted-foreground">
-              Showing {filteredGroups.length} of {groups?.length || 0} groups
+              Showing {filteredGroups.length} of {Array.isArray(groups) ? groups.length : 0} groups
             </CardFooter>
           )}
         </Card>

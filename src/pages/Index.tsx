@@ -55,7 +55,10 @@ export default function Dashboard() {
     fetchNginxStatus();
   }, []);
 
-  const activeGroups = groups?.filter(group => group.enabled).length || 0;
+  // Make sure groups is treated as an array with a fallback to empty array
+  const activeGroups = Array.isArray(groups) 
+    ? groups.filter(group => group.enabled).length 
+    : 0;
 
   const handleCommitChanges = async () => {
     const success = await commitChanges();
@@ -210,7 +213,7 @@ export default function Dashboard() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {groups && groups.map((group) => (
+            {Array.isArray(groups) && groups.length > 0 ? groups.map((group) => (
               <Card key={group.id} className="overflow-hidden">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -246,7 +249,20 @@ export default function Dashboard() {
                   </Button>
                 </CardFooter>
               </Card>
-            ))}
+            )) : (
+              <Card className="flex flex-col items-center justify-center p-6 border-dashed">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                  <ListFilter className="h-10 w-10 text-muted-foreground" />
+                </div>
+                <h3 className="mt-4 text-xl font-medium">No whitelist groups found</h3>
+                <p className="mb-4 mt-2 text-center text-sm text-muted-foreground">
+                  Create a new whitelist group to manage access control.
+                </p>
+                <Button asChild>
+                  <Link to="/whitelist/create">Create Whitelist Group</Link>
+                </Button>
+              </Card>
+            )}
             <Card className="flex flex-col items-center justify-center p-6 border-dashed">
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
                 <ListFilter className="h-10 w-10 text-muted-foreground" />

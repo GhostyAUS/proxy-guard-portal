@@ -32,6 +32,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  // Initialize groups as an empty array to avoid the filter is not a function error
   const [groups, setGroups] = useState<WhitelistGroup[]>([]);
   
   const { data, isLoading, error, refetch: tanstackRefetch } = useQuery<WhitelistGroup[]>({
@@ -40,7 +41,8 @@ export function WhitelistGroupsProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    if (data) {
+    // Ensure data is an array before setting it to groups
+    if (data && Array.isArray(data)) {
       setGroups(data);
     }
   }, [data]);
