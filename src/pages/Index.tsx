@@ -8,7 +8,8 @@ import {
   ListFilter, 
   Server, 
   Shield,
-  XCircle 
+  XCircle,
+  Upload
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
@@ -16,25 +17,39 @@ import { mockNginxStatus } from "@/utils/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const [nginxStatus] = useState(mockNginxStatus);
-  const { groups: whitelistGroups, isLoading, error } = useWhitelistGroups();
+  const { groups: whitelistGroups, isLoading, error, fetchGroups, commitChanges } = useWhitelistGroups();
   
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";
   }, []);
 
   const activeGroups = whitelistGroups.filter(group => group.enabled).length;
+
+  const handleCommitChanges = async () => {
+    const success = await commitChanges();
+    if (success) {
+      fetchGroups(); // Refresh groups after commit
+    }
+  };
   
   return (
     <Layout>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <Button asChild>
-            <Link to="/whitelist/create">Create Whitelist Group</Link>
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={handleCommitChanges} variant="outline" className="flex items-center gap-2">
+              <Upload size={16} />
+              Commit & Apply Changes
+            </Button>
+            <Button asChild>
+              <Link to="/whitelist/create">Create Whitelist Group</Link>
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -145,9 +160,14 @@ export default function Dashboard() {
                 <p className="text-sm text-center text-muted-foreground max-w-md">
                   {error}
                 </p>
-                <Button asChild className="mt-2">
-                  <Link to="/whitelist">Manage Whitelist Groups</Link>
-                </Button>
+                <div className="flex gap-2 mt-2">
+                  <Button variant="outline" onClick={() => fetchGroups()}>
+                    Retry
+                  </Button>
+                  <Button asChild>
+                    <Link to="/whitelist">Manage Whitelist Groups</Link>
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

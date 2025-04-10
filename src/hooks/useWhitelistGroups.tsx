@@ -22,6 +22,7 @@ interface WhitelistGroupsContextType {
   removeDestination: (groupId: string, destinationId: string) => Promise<void>;
   fetchGroups: () => Promise<void>;
   toggleGroupEnabled: (id: string) => Promise<void>;
+  commitChanges: () => Promise<boolean>;
 }
 
 const WhitelistGroupsContext = createContext<WhitelistGroupsContextType | undefined>(undefined);
@@ -56,6 +57,12 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       
       if (response.status >= 400) {
         throw new Error(`API returned error status: ${response.status}`);
+      }
+      
+      // Check if the response is HTML instead of JSON
+      if (typeof response.data === 'string' && response.data.trim().startsWith('<!DOCTYPE html>')) {
+        console.error("API returned HTML instead of JSON");
+        throw new Error("Invalid API response format. Server returned HTML instead of JSON.");
       }
       
       let groupsData: WhitelistGroup[] = [];
@@ -96,6 +103,72 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       });
       
       setGroups([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add new function to commit changes to nginx.conf and reload nginx
+  const commitChanges = async (): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      console.log("Committing whitelist changes to nginx.conf...");
+
+      // Get the current nginx.conf template
+      const templateResponse = await axios.get(`${API_BASE_URL}/nginx/config`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+
+      if (!templateResponse.data || !templateResponse.data.config) {
+        throw new Error("Could not retrieve nginx config template");
+      }
+
+      // Use the imported function to generate nginx config
+      const { generateNginxConfig } = await import('@/utils/nginxUtils');
+      const newConfig = generateNginxConfig(groups, templateResponse.data.config);
+
+      // Save the new config
+      const saveResponse = await axios.post(`${API_BASE_URL}/nginx/save`, {
+        config: newConfig,
+        configPath: '/etc/nginx/nginx.conf'
+      }, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!saveResponse.data || !saveResponse.data.success) {
+        throw new Error("Failed to save nginx configuration");
+      }
+
+      // Reload nginx
+      const reloadResponse = await axios.post(`${API_BASE_URL}/nginx/reload`, {}, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!reloadResponse.data || !reloadResponse.data.success) {
+        throw new Error("Failed to reload nginx service");
+      }
+
+      toast.success("Changes committed successfully", {
+        description: "All whitelist changes have been applied to the nginx configuration"
+      });
+
+      return true;
+    } catch (err) {
+      console.error("Error committing nginx changes:", err);
+      toast.error("Failed to commit changes", {
+        description: "Could not apply changes to the nginx configuration. Please try again."
+      });
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -453,7 +526,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     removeClient,
     removeDestination,
     fetchGroups,
-    toggleGroupEnabled
+    toggleGroupEnabled,
+    commitChanges
   };
 
   return (

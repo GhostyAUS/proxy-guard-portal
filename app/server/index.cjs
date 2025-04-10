@@ -1,3 +1,4 @@
+
 // Server file with CommonJS syntax
 const express = require("express");
 const app = express();
@@ -40,7 +41,7 @@ app.use((req, res, next) => {
   // Enable CORS for development
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -137,6 +138,9 @@ const whitelistGroups = [
 // GET endpoint for whitelist groups
 app.get("/api/whitelist-groups", (req, res) => {
   console.log("Whitelist groups requested - returning:", whitelistGroups.length, "groups");
+  
+  // Set proper content-type header to ensure browser doesn't interpret as HTML
+  res.setHeader('Content-Type', 'application/json');
   
   // Log the structure of what we're returning
   console.log("Response structure:", JSON.stringify({
@@ -402,6 +406,12 @@ if (fs.existsSync(distPath)) {
 app.use((err, req, res, next) => {
   console.error(`[ERROR] ${new Date().toISOString()}:`, err);
   console.error("Stack trace:", err.stack);
+  
+  // Ensure we always return JSON for API routes
+  if (req.url.startsWith('/api/')) {
+    res.setHeader('Content-Type', 'application/json');
+  }
+  
   res.status(500).json({ error: "Internal server error", message: err.message });
 });
 
