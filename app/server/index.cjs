@@ -138,8 +138,8 @@ const whitelistGroups = [
   }
 ];
 
-// GET endpoint for whitelist groups
-app.get("/api/whitelist-groups", (req, res) => {
+// GET endpoint for whitelist groups - FIX: Use /api prefix and ensure proper content-type
+app.get("/api/whitelist/groups", (req, res) => {
   console.log("Whitelist groups requested - returning:", whitelistGroups.length, "groups");
   
   // IMPORTANT: Set proper content-type header to ensure browser doesn't interpret as HTML
@@ -205,7 +205,8 @@ const updateNginxConfig = () => {
   }
 };
 
-app.post("/api/whitelist-groups", (req, res) => {
+// FIX: Use /api prefix for all API endpoints
+app.post("/api/whitelist/groups", (req, res) => {
   const group = req.body;
   console.log("Received whitelist group update request:", group.id, group.name);
   console.log("Group details:", JSON.stringify(group, null, 2));
@@ -265,8 +266,8 @@ app.post("/api/whitelist-groups", (req, res) => {
   }
 });
 
-// Delete a whitelist group
-app.delete("/api/whitelist-groups/:id", (req, res) => {
+// FIX: Use /api prefix for all API endpoints
+app.delete("/api/whitelist/groups/:id", (req, res) => {
   const id = req.params.id;
   console.log("Received delete request for whitelist group:", id);
   
@@ -333,8 +334,8 @@ app.delete("/api/whitelist-groups/:id", (req, res) => {
   }
 });
 
-// New endpoint for toggling group enabled status
-app.patch("/api/whitelist-groups/:id/toggle", (req, res) => {
+// FIX: Use /api prefix for all API endpoints
+app.patch("/api/whitelist/groups/:id/toggle", (req, res) => {
   const id = req.params.id;
   console.log("Received toggle request for whitelist group:", id);
   
@@ -388,6 +389,142 @@ app.patch("/api/whitelist-groups/:id/toggle", (req, res) => {
     // Still return success for the toggle
     res.json({ success: true, group: updatedGroup, nginxUpdated: false, error: String(err) });
   }
+});
+
+// FIX: API endpoint for applying changes
+app.post("/api/whitelist/apply", (req, res) => {
+  try {
+    // Generate NGINX config from whitelist groups
+    const config = updateNginxConfig();
+    
+    try {
+      // Write the config to a file
+      const configPath = '/etc/nginx/nginx.conf';
+      fs.writeFileSync(configPath, config);
+      console.log("NGINX configuration successfully written to:", configPath);
+      
+      // Reload nginx
+      const { exec } = require('child_process');
+      exec('nginx -s reload', (error, stdout, stderr) => {
+        if (error) {
+          console.error("Error reloading NGINX:", error);
+          console.error("STDERR:", stderr);
+          res.status(500).json({ success: false, error: String(error) });
+        } else {
+          console.log("NGINX service successfully reloaded");
+          console.log("STDOUT:", stdout);
+          res.json({ success: true });
+        }
+      });
+    } catch (configError) {
+      console.error("Error updating/reloading NGINX:", configError);
+      res.status(500).json({ success: false, error: String(configError) });
+    }
+  } catch (err) {
+    console.error("Error preparing nginx config:", err);
+    res.status(500).json({ success: false, error: String(err) });
+  }
+});
+
+// Now let's implement the missing API endpoints for group clients and destinations
+app.post("/api/whitelist/groups/:groupId/clients", (req, res) => {
+  const { groupId } = req.params;
+  const client = req.body;
+  
+  if (!client || !client.value) {
+    return res.status(400).json({ error: "Invalid client data" });
+  }
+  
+  const group = whitelistGroups.find(g => g.id === groupId);
+  if (!group) {
+    return res.status(404).json({ error: "Group not found" });
+  }
+  
+  const newClient = {
+    id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    value: client.value,
+    description: client.description || ""
+  };
+  
+  if (!Array.isArray(group.clients)) {
+    group.clients = [];
+  }
+  
+  group.clients.push(newClient);
+  
+  res.json(newClient);
+});
+
+app.post("/api/whitelist/groups/:groupId/destinations", (req, res) => {
+  const { groupId } = req.params;
+  const destination = req.body;
+  
+  if (!destination || !destination.value) {
+    return res.status(400).json({ error: "Invalid destination data" });
+  }
+  
+  const group = whitelistGroups.find(g => g.id === groupId);
+  if (!group) {
+    return res.status(404).json({ error: "Group not found" });
+  }
+  
+  const newDestination = {
+    id: `dest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    value: destination.value,
+    description: destination.description || ""
+  };
+  
+  if (!Array.isArray(group.destinations)) {
+    group.destinations = [];
+  }
+  
+  group.destinations.push(newDestination);
+  
+  res.json(newDestination);
+});
+
+app.delete("/api/whitelist/groups/:groupId/clients/:clientId", (req, res) => {
+  const { groupId, clientId } = req.params;
+  
+  const group = whitelistGroups.find(g => g.id === groupId);
+  if (!group) {
+    return res.status(404).json({ error: "Group not found" });
+  }
+  
+  if (!Array.isArray(group.clients)) {
+    return res.status(404).json({ error: "No clients in this group" });
+  }
+  
+  const initialLength = group.clients.length;
+  group.clients = group.clients.filter(c => c.id !== clientId);
+  
+  if (group.clients.length === initialLength) {
+    return res.status(404).json({ error: "Client not found" });
+  }
+  
+  res.json({ success: true });
+});
+
+app.delete("/api/whitelist/groups/:groupId/destinations/:destinationId", (req, res) => {
+  const { groupId, destinationId } = req.params;
+  
+  const group = whitelistGroups.find(g => g.id === groupId);
+  if (!group) {
+    return res.status(404).json({ error: "Group not found" });
+  }
+  
+  if (!Array.isArray(group.destinations)) {
+    return res.status(404).json({ error: "No destinations in this group" });
+  }
+  
+  const initialLength = group.destinations.length;
+  group.destinations = group.destinations.filter(d => d.id !== destinationId);
+  
+  if (group.destinations.length === initialLength) {
+    return res.status(404).json({ error: "Destination not found" });
+  }
+  
+  res.json({ success: true });
 });
 
 // Serve static files from the dist directory for frontend

@@ -90,8 +90,8 @@ export async function fetchProxySettings(): Promise<ProxySettings> {
     console.error('Error fetching proxy settings:', error);
     // Return default settings instead of throwing
     return {
-      httpPort: "8080",  // Changed to string
-      httpsPort: "8443", // Changed to string
+      httpPort: "8080",
+      httpsPort: "8443",
       maxUploadSize: "10m",
       sslCertPath: "/etc/nginx/certs/server.crt"
     };
