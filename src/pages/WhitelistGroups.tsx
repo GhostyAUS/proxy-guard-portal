@@ -35,6 +35,7 @@ export default function WhitelistGroups() {
   const { groups, isLoading, error, addGroup, updateGroup, deleteGroup: removeGroup, fetchGroups } = useWhitelistGroups();
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteGroupItem, setDeleteGroupItem] = useState<WhitelistGroup | null>(null);
+  const [toggleLoading, setToggleLoading] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Whitelist Groups | Proxy Guard";
@@ -64,16 +65,24 @@ export default function WhitelistGroups() {
     setSearchQuery(e.target.value);
   };
 
-  const handleToggleGroup = (groupId: string) => {
-    const group = groups.find(g => g.id === groupId);
-    if (group) {
-      const updatedGroup = { ...group, enabled: !group.enabled };
-      updateGroup(updatedGroup);
-      
-      toast(
-        updatedGroup.enabled ? "Group enabled" : "Group disabled", 
-        { description: `${updatedGroup.name} has been ${updatedGroup.enabled ? 'enabled' : 'disabled'}` }
-      );
+  const handleToggleGroup = async (groupId: string) => {
+    try {
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        setToggleLoading(groupId);
+        const updatedGroup = { ...group, enabled: !group.enabled };
+        await updateGroup(updatedGroup);
+        
+        toast(
+          updatedGroup.enabled ? "Group enabled" : "Group disabled", 
+          { description: `${updatedGroup.name} has been ${updatedGroup.enabled ? 'enabled' : 'disabled'}` }
+        );
+      }
+    } catch (error) {
+      console.error("Error toggling group:", error);
+      toast.error("Failed to update group status");
+    } finally {
+      setToggleLoading(null);
     }
   };
 
@@ -81,13 +90,21 @@ export default function WhitelistGroups() {
     setDeleteGroupItem(group);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteGroupItem) {
-      removeGroup(deleteGroupItem.id);
-      toast.success(`Group deleted`, { 
-        description: `${deleteGroupItem.name} has been deleted` 
-      });
-      setDeleteGroupItem(null);
+      try {
+        await removeGroup(deleteGroupItem.id);
+        toast.success(`Group deleted`, { 
+          description: `${deleteGroupItem.name} has been deleted` 
+        });
+      } catch (error) {
+        console.error("Error deleting group:", error);
+        toast.error("Failed to delete group", {
+          description: "An error occurred while deleting the group"
+        });
+      } finally {
+        setDeleteGroupItem(null);
+      }
     }
   };
 
@@ -184,11 +201,12 @@ export default function WhitelistGroups() {
                         <TableCell className="hidden md:table-cell">
                           <div className="flex items-center space-x-2">
                             <Switch 
-                              checked={group.enabled} 
-                              onCheckedChange={() => handleToggleGroup(group.id)} 
+                              checked={group.enabled}
+                              onCheckedChange={() => handleToggleGroup(group.id)}
+                              disabled={toggleLoading === group.id}
                             />
                             <Badge variant={group.enabled ? "default" : "outline"}>
-                              {group.enabled ? "Enabled" : "Disabled"}
+                              {toggleLoading === group.id ? "Updating..." : group.enabled ? "Enabled" : "Disabled"}
                             </Badge>
                           </div>
                         </TableCell>

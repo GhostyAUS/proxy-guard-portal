@@ -50,26 +50,26 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       
       if (response.data && Array.isArray(response.data.groups)) {
         setGroups(response.data.groups);
-      } else if (response.data && typeof response.data === 'object' && !Array.isArray(response.data.groups)) {
-        console.warn("API response format unexpected:", response.data);
-        setGroups([]);
-        
-        // Try to extract groups if possible
-        if (Object.keys(response.data).length > 0) {
-          const possibleGroups = response.data.groups || [];
-          if (Array.isArray(possibleGroups)) {
-            setGroups(possibleGroups);
-          }
-        }
+        console.log(`Successfully loaded ${response.data.groups.length} groups from API`);
       } else {
         console.warn("API response format unexpected:", response.data);
-        setGroups([]);
         
-        // Fallback to mock data if API fails
-        import('@/utils/mockData').then(module => {
-          console.log("Using mock whitelist groups data");
-          setGroups(module.mockWhitelistGroups);
-        });
+        // Try to extract groups if possible
+        if (response.data && typeof response.data === 'object') {
+          const possibleGroups = response.data.groups || [];
+          if (Array.isArray(possibleGroups)) {
+            console.log(`Found ${possibleGroups.length} groups in response`);
+            setGroups(possibleGroups);
+          } else {
+            // Set empty array if we couldn't extract groups
+            console.warn("Could not extract groups from response");
+            setGroups([]);
+          }
+        } else {
+          // Set empty array as fallback
+          console.warn("Could not extract any data from response");
+          setGroups([]);
+        }
       }
     } catch (err) {
       console.error("Error fetching whitelist groups:", err);
@@ -78,11 +78,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         description: "Could not retrieve groups from the server"
       });
       
-      // Fallback to mock data if API fails
-      import('@/utils/mockData').then(module => {
-        console.log("Using mock whitelist groups data due to error");
-        setGroups(module.mockWhitelistGroups);
-      });
+      // Set empty array on error
+      setGroups([]);
     } finally {
       setIsLoading(false);
     }
@@ -92,44 +89,9 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     fetchGroups();
   }, []);
 
-  const generateAndSaveNginxConfig = async (updatedGroups: WhitelistGroup[]) => {
-    try {
-      console.log("Generating and saving NGINX configuration...");
-      // Get current NGINX configuration template
-      const { DEFAULT_NGINX_TEMPLATE } = await import('@/utils/nginxUtils');
-      
-      // Generate new configuration
-      const { generateNginxConfig } = await import('@/utils/nginxUtils');
-      const newConfig = generateNginxConfig(updatedGroups, DEFAULT_NGINX_TEMPLATE);
-      
-      // Save the updated configuration
-      console.log("Saving NGINX configuration...");
-      await axios.post(`${API_BASE_URL}/nginx/save`, {
-        config: newConfig,
-        configPath: '/etc/nginx/nginx.conf'
-      });
-      
-      // Reload NGINX to apply changes
-      console.log("Reloading NGINX...");
-      await axios.post(`${API_BASE_URL}/nginx/reload`);
-      
-      console.log("NGINX configuration updated and reloaded successfully");
-      toast.success("NGINX configuration updated", {
-        description: "Changes have been applied successfully"
-      });
-      
-      return true;
-    } catch (err) {
-      console.error("Error updating NGINX configuration:", err);
-      toast.error("Failed to update NGINX configuration", {
-        description: "Check server logs for details"
-      });
-      return false;
-    }
-  };
-
   const addGroup = useCallback(async (group: Omit<WhitelistGroup, "id">): Promise<WhitelistGroup> => {
     try {
+      setIsLoading(true);
       const newGroup: WhitelistGroup = {
         ...group,
         id: uuidv4(),
@@ -165,15 +127,23 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         description: "Could not save the group to the server"
       });
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   const updateGroup = useCallback(async (updatedGroup: WhitelistGroup): Promise<void> => {
     try {
+      setIsLoading(true);
       console.log("Updating whitelist group:", updatedGroup);
       
       // Send to API
-      const response = await axios.post(`${API_BASE_URL}/whitelist-groups`, updatedGroup);
+      const response = await axios.post(`${API_BASE_URL}/whitelist-groups`, updatedGroup, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      });
       
       if (response.data && response.data.success) {
         // Update local state
@@ -194,15 +164,23 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         description: "Could not save the changes to the server"
       });
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
   const deleteGroup = useCallback(async (id: string): Promise<void> => {
     try {
+      setIsLoading(true);
       console.log("Deleting whitelist group:", id);
       
       // Send to API
-      const response = await axios.delete(`${API_BASE_URL}/whitelist-groups/${id}`);
+      const response = await axios.delete(`${API_BASE_URL}/whitelist-groups/${id}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      });
       
       if (response.data && response.data.success) {
         // Update local state
@@ -221,6 +199,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         description: "Could not remove the group from the server"
       });
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -228,6 +208,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
 
   const addClientToGroup = useCallback(async (groupId: string, client: { value: string; description?: string }) => {
     try {
+      setIsLoading(true);
       const group = getGroupById(groupId);
       if (!group) throw new Error("Group not found");
       
@@ -243,11 +224,14 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       console.error("Error adding client to group:", err);
       toast.error("Failed to add client to group");
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, [getGroupById, updateGroup]);
 
   const addDestinationToGroup = useCallback(async (groupId: string, destination: { value: string; description?: string }) => {
     try {
+      setIsLoading(true);
       const group = getGroupById(groupId);
       if (!group) throw new Error("Group not found");
       
@@ -263,11 +247,14 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       console.error("Error adding destination to group:", err);
       toast.error("Failed to add destination to group");
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, [getGroupById, updateGroup]);
 
   const removeClientFromGroup = useCallback(async (groupId: string, clientId: string) => {
     try {
+      setIsLoading(true);
       const group = getGroupById(groupId);
       if (!group) throw new Error("Group not found");
       
@@ -282,11 +269,14 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       console.error("Error removing client from group:", err);
       toast.error("Failed to remove client from group");
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, [getGroupById, updateGroup]);
 
   const removeDestinationFromGroup = useCallback(async (groupId: string, destinationId: string) => {
     try {
+      setIsLoading(true);
       const group = getGroupById(groupId);
       if (!group) throw new Error("Group not found");
       
@@ -301,6 +291,8 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       console.error("Error removing destination from group:", err);
       toast.error("Failed to remove destination from group");
       throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, [getGroupById, updateGroup]);
 

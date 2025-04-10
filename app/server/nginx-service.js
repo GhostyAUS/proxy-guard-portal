@@ -1,3 +1,4 @@
+
 /**
  * NGINX operations service for the Proxy Guard application
  */
@@ -24,7 +25,7 @@ const execPromise = (command) => {
 };
 
 // Get NGINX status
-router.get('/nginx/status', async (req, res) => {
+router.get('/status', async (req, res) => {
   try {
     // Check if nginx is running
     let isRunning = false;
@@ -69,7 +70,7 @@ router.get('/nginx/status', async (req, res) => {
 });
 
 // Get current NGINX configuration
-router.get('/nginx/config', (req, res) => {
+router.get('/config', (req, res) => {
   try {
     const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
     
@@ -86,7 +87,7 @@ router.get('/nginx/config', (req, res) => {
 });
 
 // Validate NGINX config syntax
-router.post('/nginx/validate', async (req, res) => {
+router.post('/validate', async (req, res) => {
   try {
     const { config, configPath } = req.body;
     
@@ -120,26 +121,40 @@ router.post('/nginx/validate', async (req, res) => {
 });
 
 // Save NGINX config
-router.post('/nginx/save', async (req, res) => {
+router.post('/save', async (req, res) => {
   try {
-    const { config, configPath } = req.body;
+    const { config } = req.body;
+    const configPath = req.body.configPath || '/etc/nginx/nginx.conf';
+    
+    console.log(`Saving NGINX config to ${configPath}`);
     
     // Create backup of existing config
     if (fs.existsSync(configPath)) {
       const backupPath = `${configPath}.bak-${Date.now()}`;
       fs.copyFileSync(configPath, backupPath);
+      console.log(`Created backup at ${backupPath}`);
     }
     
     // Ensure directory exists
     const configDir = path.dirname(configPath);
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
+      console.log(`Created directory ${configDir}`);
     }
     
     // Write new config
-    fs.writeFileSync(configPath, config);
-    
-    res.json({ success: true });
+    try {
+      fs.writeFileSync(configPath, config);
+      console.log('NGINX config saved successfully');
+      
+      res.json({ success: true });
+    } catch (writeError) {
+      console.error('Error writing config file:', writeError);
+      res.status(500).json({ 
+        success: false, 
+        error: `Failed to write config: ${writeError.message}` 
+      });
+    }
   } catch (error) {
     console.error('Error saving nginx config:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -147,9 +162,9 @@ router.post('/nginx/save', async (req, res) => {
 });
 
 // Test if config path is writable
-router.post('/nginx/test-writable', (req, res) => {
+router.post('/test-writable', (req, res) => {
   try {
-    const { configPath } = req.body;
+    const configPath = req.body.configPath || '/etc/nginx/nginx.conf';
     
     // Test if directory is writable
     const configDir = path.dirname(configPath);
@@ -182,13 +197,22 @@ router.post('/nginx/test-writable', (req, res) => {
 });
 
 // Reload NGINX
-router.post('/nginx/reload', async (req, res) => {
+router.post('/reload', async (req, res) => {
   try {
     console.log('Attempting to reload NGINX configuration...');
+    
     // Execute nginx reload command
-    await execPromise('nginx -s reload');
-    console.log('NGINX reload successful');
-    res.json({ success: true });
+    try {
+      await execPromise('nginx -s reload');
+      console.log('NGINX reload successful');
+      res.json({ success: true });
+    } catch (execError) {
+      console.error('Error executing nginx reload command:', execError);
+      res.status(500).json({ 
+        success: false, 
+        error: execError.stderr || 'Failed to reload NGINX'
+      });
+    }
   } catch (error) {
     console.error('Error reloading nginx:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -196,7 +220,7 @@ router.post('/nginx/reload', async (req, res) => {
 });
 
 // Generate htpasswd file
-router.post('/nginx/htpasswd', async (req, res) => {
+router.post('/htpasswd', async (req, res) => {
   try {
     const { users } = req.body;
     const htpasswdPath = '/etc/nginx/.htpasswd';
@@ -327,147 +351,5 @@ router.get('/logs', (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Get whitelist groups from NGINX config
-router.get('/whitelist-groups', (req, res) => {
-  try {
-    console.log('Whitelist groups requested from API');
-    const configPath = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
-    
-    if (!fs.existsSync(configPath)) {
-      console.warn('Configuration file not found:', configPath);
-      return res.status(404).json({ error: 'Configuration file not found' });
-    }
-    
-    const config = fs.readFileSync(configPath, 'utf8');
-    console.log('NGINX config loaded successfully');
-    
-    // Return mock data if can't extract from config
-    const groups = [
-      {
-        id: "group-1",
-        name: "Default Group",
-        description: "Default whitelist group",
-        clients: [
-          { id: "client-1", value: "192.168.0.0/16", description: "Local network" },
-          { id: "client-2", value: "127.0.0.1", description: "Localhost" }
-        ],
-        destinations: [
-          { id: "dest-1", value: "example.com", description: "Example site" },
-          { id: "dest-2", value: "*.google.com", description: "Google domains" }
-        ],
-        enabled: true
-      }
-    ];
-    
-    res.json({ groups });
-  } catch (error) {
-    console.error('Error getting whitelist groups:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Helper function to extract whitelist groups from NGINX config
-function extractWhitelistGroups(config) {
-  const groups = [];
-  let currentGroup = null;
-  
-  // Extract group comments and maps
-  const lines = config.split('\n');
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Check for group comment
-    if (line.startsWith('# Group:')) {
-      const name = line.replace('# Group:', '').trim();
-      currentGroup = {
-        id: `group-${Date.now()}-${groups.length}`,
-        name,
-        description: '',
-        clients: [],
-        destinations: [],
-        enabled: true
-      };
-    }
-    
-    // Check for client IPs map
-    if (line.startsWith('map $remote_addr $client_') && currentGroup) {
-      const clientMapLines = getMapBlock(lines, i);
-      
-      // Extract client IPs
-      for (const mapLine of clientMapLines) {
-        const trimmedLine = mapLine.trim();
-        if (trimmedLine && !trimmedLine.startsWith('default') && trimmedLine.includes('1;')) {
-          const ipValue = trimmedLine.split(' ')[0];
-          currentGroup.clients.push({
-            id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            value: ipValue,
-            description: ''
-          });
-        }
-      }
-      
-      // Skip processed lines
-      i += clientMapLines.length;
-    }
-    
-    // Check for destinations map
-    if (line.startsWith('map $http_host $dest_') && currentGroup) {
-      const destMapLines = getMapBlock(lines, i);
-      
-      // Extract destinations
-      for (const mapLine of destMapLines) {
-        const trimmedLine = mapLine.trim();
-        if (trimmedLine && !trimmedLine.startsWith('default') && trimmedLine.includes('1;')) {
-          const destValue = trimmedLine.split(' ')[0];
-          currentGroup.destinations.push({
-            id: `dest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            value: destValue,
-            description: ''
-          });
-        }
-      }
-      
-      // Add group to list and reset current group
-      groups.push(currentGroup);
-      currentGroup = null;
-      
-      // Skip processed lines
-      i += destMapLines.length;
-    }
-  }
-  
-  return groups;
-}
-
-// Helper function to get all lines in a map block
-function getMapBlock(lines, startIndex) {
-  const mapLines = [];
-  let bracesCount = 0;
-  let index = startIndex;
-  
-  // Find opening brace
-  while (index < lines.length && !lines[index].includes('{')) {
-    index++;
-  }
-  
-  // Process block content
-  while (index < lines.length) {
-    const line = lines[index];
-    mapLines.push(line);
-    
-    if (line.includes('{')) bracesCount++;
-    if (line.includes('}')) bracesCount--;
-    
-    if (bracesCount === 0 && mapLines.length > 1) {
-      break;
-    }
-    
-    index++;
-  }
-  
-  return mapLines;
-}
 
 module.exports = router;

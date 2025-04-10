@@ -93,14 +93,14 @@ const whitelistGroups = [
 
 // GET endpoint for whitelist groups
 app.get("/api/whitelist-groups", (req, res) => {
-  console.log("Whitelist groups requested - returning:", whitelistGroups);
+  console.log("Whitelist groups requested - returning:", whitelistGroups.length, "groups");
   res.json({ groups: whitelistGroups });
 });
 
 // Create or update a whitelist group
 app.post("/api/whitelist-groups", (req, res) => {
   const group = req.body;
-  console.log("Received whitelist group update request:", group);
+  console.log("Received whitelist group update request:", group.id, group.name);
   
   if (!group || !group.id) {
     return res.status(400).json({ error: "Invalid whitelist group data" });
@@ -118,16 +118,66 @@ app.post("/api/whitelist-groups", (req, res) => {
 
   // Update nginx config whenever a whitelist group is created or updated
   try {
-    // In a real implementation, we would update the nginx config here
-    // For now, we'll just log it
-    console.log("Nginx configuration would be updated with new whitelist groups");
+    // Generate NGINX config from whitelist groups
+    const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
     
-    // Simulate reloading nginx
-    console.log("Nginx service would be reloaded to apply new configuration");
+    // Simple implementation of generateNginxConfig
+    const mapBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
+      // Generate the client IPs map
+      const clientIpsMap = group.clients.map(client => 
+        `    ${client.value} 1;`
+      ).join('\n');
+      
+      // Generate the destinations map
+      const destinationsMap = group.destinations.map(dest => 
+        `    ${dest.value} 1;`
+      ).join('\n');
+      
+      return `
+# Group: ${group.name}
+map $remote_addr $client_${group.id} {
+    default 0;
+${clientIpsMap}
+}
+
+map $http_host $dest_${group.id} {
+    default 0;
+${destinationsMap}
+}
+`;
+    }).join('\n');
     
-    res.json({ success: true, group });
+    // Generate the access condition for the server block
+    const accessConditions = whitelistGroups.filter(g => g.enabled).map(group => 
+      `        if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
+    ).join('\n');
+    
+    // Replace placeholders in the template
+    let config = nginxConfigTemplate;
+    config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
+    config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
+    
+    // For development - log generated config
+    console.log("Generated NGINX config with access conditions:", accessConditions.length > 0 ? "Yes" : "No");
+    
+    try {
+      // Simulate updating nginx config
+      // In a real implementation, this would write the config to the appropriate location
+      console.log("NGINX configuration would be updated");
+      // Here we would call the actual nginx service, but for now we're just simulating it
+      
+      // Simulate reloading nginx
+      console.log("NGINX service would be reloaded to apply new configuration");
+      
+      // Let the frontend know the update was successful
+      res.json({ success: true, group });
+    } catch (configError) {
+      console.error("Error updating NGINX config:", configError);
+      // Still return success for the group save, but indicate the NGINX config wasn't updated
+      res.json({ success: true, group, nginxUpdated: false });
+    }
   } catch (err) {
-    console.error("Error updating nginx config:", err);
+    console.error("Error preparing nginx config:", err);
     // Still return success for the group save
     res.json({ success: true, group, nginxUpdated: false });
   }
@@ -139,25 +189,74 @@ app.delete("/api/whitelist-groups/:id", (req, res) => {
   console.log("Received delete request for whitelist group:", id);
   
   const initialLength = whitelistGroups.length;
+  const groupToDelete = whitelistGroups.find(g => g.id === id);
   const filteredGroups = whitelistGroups.filter(g => g.id !== id);
   
   if (filteredGroups.length < initialLength) {
     // Update the in-memory array
     whitelistGroups.length = 0;
     whitelistGroups.push(...filteredGroups);
-    console.log("Deleted whitelist group:", id);
+    console.log("Deleted whitelist group:", id, "New count:", whitelistGroups.length);
     
     // Update nginx config
     try {
-      // In a real implementation, we would update the nginx config here
-      console.log("Nginx configuration would be updated after group deletion");
+      // Generate NGINX config from whitelist groups (similar to above)
+      const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
       
-      // Simulate reloading nginx
-      console.log("Nginx service would be reloaded to apply new configuration");
+      // Simple implementation of generateNginxConfig
+      const mapBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
+        // Generate the client IPs map
+        const clientIpsMap = group.clients.map(client => 
+          `    ${client.value} 1;`
+        ).join('\n');
+        
+        // Generate the destinations map
+        const destinationsMap = group.destinations.map(dest => 
+          `    ${dest.value} 1;`
+        ).join('\n');
+        
+        return `
+# Group: ${group.name}
+map $remote_addr $client_${group.id} {
+    default 0;
+${clientIpsMap}
+}
+
+map $http_host $dest_${group.id} {
+    default 0;
+${destinationsMap}
+}
+`;
+      }).join('\n');
       
-      res.json({ success: true });
+      // Generate the access condition for the server block
+      const accessConditions = whitelistGroups.filter(g => g.enabled).map(group => 
+        `        if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
+      ).join('\n');
+      
+      // Replace placeholders in the template
+      let config = nginxConfigTemplate;
+      config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
+      config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
+      
+      // For development - log generated config
+      console.log("Generated NGINX config after deletion with access conditions:", accessConditions.length > 0 ? "Yes" : "No");
+      
+      try {
+        // Simulate updating nginx config
+        console.log("NGINX configuration would be updated after group deletion");
+        
+        // Simulate reloading nginx
+        console.log("NGINX service would be reloaded to apply new configuration");
+        
+        res.json({ success: true });
+      } catch (configError) {
+        console.error("Error updating NGINX config after deletion:", configError);
+        // Still return success for the group deletion
+        res.json({ success: true, nginxUpdated: false });
+      }
     } catch (err) {
-      console.error("Error updating nginx config after deletion:", err);
+      console.error("Error preparing nginx config after deletion:", err);
       // Still return success for the group deletion
       res.json({ success: true, nginxUpdated: false });
     }
