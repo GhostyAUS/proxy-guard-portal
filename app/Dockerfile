@@ -58,7 +58,7 @@ COPY --from=build /app/package.json ./
 # Create server directory
 RUN mkdir -p /app/server
 
-# Write server file with CommonJS extension
+# Create the server file with CommonJS syntax
 RUN echo '// Server file with CommonJS syntax' > /app/server/index.cjs
 RUN echo 'const express = require("express");' >> /app/server/index.cjs
 RUN echo 'const app = express();' >> /app/server/index.cjs
@@ -84,8 +84,75 @@ RUN echo 'app.listen(PORT, () => {' >> /app/server/index.cjs
 RUN echo '  console.log(`API Server running on port ${PORT}`);' >> /app/server/index.cjs
 RUN echo '});' >> /app/server/index.cjs
 
-# Copy the start script
-COPY start.sh /app/start.sh
+# Create the start.sh script directly in the container
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'echo "Starting services with pre-created script..."' >> /app/start.sh && \
+    echo 'echo "Current directory: $(pwd)"' >> /app/start.sh && \
+    echo 'echo "Files in current directory: $(ls -la)"' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Start the backend API server if it exists' >> /app/start.sh && \
+    echo 'if [ -f "/app/server/index.cjs" ]; then' >> /app/start.sh && \
+    echo '  echo "Starting API server from .cjs file..."' >> /app/start.sh && \
+    echo '  node /app/server/index.cjs &' >> /app/start.sh && \
+    echo '  API_PID=$!' >> /app/start.sh && \
+    echo '  echo "API server started with PID: $API_PID"' >> /app/start.sh && \
+    echo '  ' >> /app/start.sh && \
+    echo '  # Check if process is actually running' >> /app/start.sh && \
+    echo '  if ps -p $API_PID > /dev/null; then' >> /app/start.sh && \
+    echo '    echo "API server running successfully"' >> /app/start.sh && \
+    echo '  else' >> /app/start.sh && \
+    echo '    echo "ERROR: API server failed to start properly"' >> /app/start.sh && \
+    echo '  fi' >> /app/start.sh && \
+    echo 'else' >> /app/start.sh && \
+    echo '  echo "WARNING: API server file not found at /app/server/index.cjs"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Create a simple package.json with a start script if it doesn'"'"'t exist' >> /app/start.sh && \
+    echo 'if [ ! -f "package.json" ] || ! grep -q "\"start\":" package.json; then' >> /app/start.sh && \
+    echo '  echo "Creating or updating package.json with start script..."' >> /app/start.sh && \
+    echo '  cat > package.json << EOF' >> /app/start.sh && \
+    echo '{' >> /app/start.sh && \
+    echo '  "name": "proxy-guard-app",' >> /app/start.sh && \
+    echo '  "version": "1.0.0",' >> /app/start.sh && \
+    echo '  "scripts": {' >> /app/start.sh && \
+    echo '    "start": "npx serve -s dist || npx serve || echo '"'"'No frontend to serve'"'"'"' >> /app/start.sh && \
+    echo '  }' >> /app/start.sh && \
+    echo '}' >> /app/start.sh && \
+    echo 'EOF' >> /app/start.sh && \
+    echo '  echo "Created package.json with start script"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Show package.json contents' >> /app/start.sh && \
+    echo 'echo "Package.json contents:"' >> /app/start.sh && \
+    echo 'cat package.json' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Check if dist directory exists and if it has files' >> /app/start.sh && \
+    echo 'if [ -d "dist" ]; then' >> /app/start.sh && \
+    echo '  echo "Found dist directory, contents:"' >> /app/start.sh && \
+    echo '  ls -la dist || echo "Empty dist directory"' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '# Finally start the frontend with the npm start script that should now exist' >> /app/start.sh && \
+    echo 'echo "Starting frontend..."' >> /app/start.sh && \
+    echo 'NODE_ENV=production npm start || {' >> /app/start.sh && \
+    echo '  echo "Frontend start script failed, trying alternatives..."' >> /app/start.sh && \
+    echo '  ' >> /app/start.sh && \
+    echo '  # Fallback serving mechanism' >> /app/start.sh && \
+    echo '  if [ -d "dist" ] && [ -f "dist/index.html" ]; then' >> /app/start.sh && \
+    echo '    echo "Serving dist directory..."' >> /app/start.sh && \
+    echo '    npx serve -s dist' >> /app/start.sh && \
+    echo '  elif [ -f "index.html" ]; then' >> /app/start.sh && \
+    echo '    echo "Serving current directory..."' >> /app/start.sh && \
+    echo '    npx serve' >> /app/start.sh && \
+    echo '  else' >> /app/start.sh && \
+    echo '    echo "ERROR: Could not determine how to start the frontend. Keeping container alive for debugging..."' >> /app/start.sh && \
+    echo '    echo "Current directory structure:"' >> /app/start.sh && \
+    echo '    find . -type f -name "*.html" | sort' >> /app/start.sh && \
+    echo '    tail -f /dev/null' >> /app/start.sh && \
+    echo '  fi' >> /app/start.sh && \
+    echo '}' >> /app/start.sh
+
+# Make the start script executable
 RUN chmod +x /app/start.sh
 
 # Set the entrypoint
