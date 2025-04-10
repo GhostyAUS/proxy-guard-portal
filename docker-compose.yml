@@ -39,7 +39,7 @@ services:
     volumes:
       - nginx_config:/etc/nginx:rw
       - nginx_logs:/var/log/nginx:rw
-      - ./nginx/certs:/etc/nginx/certs:ro
+      - nginx_certs:/etc/nginx/certs:rw  # Changed to rw so certificates can be created
     restart: unless-stopped
 
 networks:
@@ -48,3 +48,4 @@ networks:
 volumes:
   nginx_config:
   nginx_logs:
+  nginx_certs:  # Added new volume for certificates
