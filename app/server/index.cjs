@@ -3,6 +3,7 @@
 const express = require("express");
 const app = express();
 const PORT = process.env.API_PORT || 3001;
+const nginxService = require("./nginx-service");
 
 app.use(express.json());
 
@@ -13,6 +14,32 @@ app.get("/api/health", (req, res) => {
     status: "ok", 
     timestamp: new Date(),
     environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Mount the NGINX service
+app.use("/api", nginxService);
+
+// Mock endpoint for whitelist groups
+app.get("/api/whitelist-groups", (req, res) => {
+  console.log("Whitelist groups requested");
+  res.json({ 
+    groups: [
+      {
+        id: "group-1",
+        name: "Default Group",
+        description: "Default whitelist group",
+        clients: [
+          { id: "client-1", value: "192.168.0.0/16", description: "Local network" },
+          { id: "client-2", value: "127.0.0.1", description: "Localhost" }
+        ],
+        destinations: [
+          { id: "dest-1", value: "example.com", description: "Example site" },
+          { id: "dest-2", value: "*.google.com", description: "Google domains" }
+        ],
+        enabled: true
+      }
+    ] 
   });
 });
 
@@ -45,6 +72,8 @@ try {
     console.log(`Server time: ${new Date().toISOString()}`);
     console.log("Server endpoints:");
     console.log("  - GET /api/health");
+    console.log("  - GET/POST /api/whitelist-groups");
+    console.log("  - GET/POST /api/nginx/*");
   });
 } catch (error) {
   console.error("Failed to start API server:", error);

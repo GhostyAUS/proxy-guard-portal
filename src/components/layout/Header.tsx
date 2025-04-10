@@ -69,7 +69,7 @@ export function Header() {
                 </div>
               )}
               <DropdownMenuItem asChild className="justify-center cursor-pointer">
-                <Link to="/notifications" className="w-full">View all</Link>
+                <Link to="/whitelist" className="w-full">View all whitelist groups</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
