@@ -3,6 +3,9 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
+# Add build argument for npm flags
+ARG NPM_FLAGS=""
+
 # Copy necessary files
 COPY . .
 
@@ -12,7 +15,7 @@ RUN echo "Current working directory contents:" && ls -la
 # Install dependencies
 RUN if [ -f "package.json" ]; then \
       echo "Found package.json, installing dependencies..." && \
-      npm install; \
+      npm install $NPM_FLAGS; \
     else \
       echo "No package.json found in current directory, searching..." && \
       find / -name "package.json" -not -path "*/node_modules/*" -not -path "*/\.*" | head -n 5 && \
