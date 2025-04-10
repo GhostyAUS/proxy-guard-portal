@@ -1,5 +1,13 @@
-import { WhitelistGroup } from "@/types/proxy";
 
+import { WhitelistGroup } from "@/types/proxy";
+import axios from "axios";
+
+// API endpoint for nginx operations
+const API_BASE_URL = process.env.API_BASE_URL || "/api";
+
+/**
+ * Generates an NGINX configuration from whitelist groups
+ */
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
   // Start with the base template
   let config = configTemplate;
@@ -42,26 +50,67 @@ ${destinationsMap}
   return config;
 };
 
+/**
+ * Validates the NGINX configuration syntax
+ */
 export const validateNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
-  // This is a mock function - in a real implementation this would make an API call to test the nginx config
-  return true;
+  try {
+    const response = await axios.post(`${API_BASE_URL}/nginx/validate`, {
+      configPath,
+      config
+    });
+    
+    return response.data.success === true;
+  } catch (error) {
+    console.error("Error validating NGINX config:", error);
+    throw new Error("Failed to validate NGINX configuration");
+  }
 };
 
+/**
+ * Saves the NGINX configuration to the specified file
+ */
 export const saveNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
-  // This is a mock function - in a real implementation this would make an API call to save the nginx config
-  console.log("Saving nginx config to", configPath);
-  console.log(config);
-  return true;
+  try {
+    const response = await axios.post(`${API_BASE_URL}/nginx/save`, {
+      configPath,
+      config
+    });
+    
+    return response.data.success === true;
+  } catch (error) {
+    console.error("Error saving NGINX config:", error);
+    throw new Error("Failed to save NGINX configuration file");
+  }
 };
 
+/**
+ * Reloads the NGINX service to apply configuration changes
+ */
 export const reloadNginxConfig = async (): Promise<boolean> => {
-  // This is a mock function - in a real implementation this would make an API call to reload nginx
-  return true;
+  try {
+    const response = await axios.post(`${API_BASE_URL}/nginx/reload`);
+    return response.data.success === true;
+  } catch (error) {
+    console.error("Error reloading NGINX:", error);
+    throw new Error("Failed to reload NGINX service");
+  }
 };
 
+/**
+ * Tests if the NGINX configuration file is writable
+ */
 export const testConfigWritable = async (configPath: string): Promise<boolean> => {
-  // This is a mock function - in a real implementation this would check if the config file is writable
-  return true;
+  try {
+    const response = await axios.post(`${API_BASE_URL}/nginx/test-writable`, {
+      configPath
+    });
+    
+    return response.data.writable === true;
+  } catch (error) {
+    console.error("Error testing if config is writable:", error);
+    throw new Error("Failed to test if configuration file is writable");
+  }
 };
 
 // Updated nginx combined proxy template
@@ -127,3 +176,33 @@ http {
     }
 }
 `;
+
+/**
+ * Create a backend API service to handle NGINX operations
+ */
+export const createAPIService = async (backendUrl: string): Promise<boolean> => {
+  try {
+    const response = await axios.post(`${backendUrl}/setup`, {
+      type: 'nginx'
+    });
+    return response.data.success === true;
+  } catch (error) {
+    console.error("Error setting up API service:", error);
+    throw new Error("Failed to set up API service for NGINX operations");
+  }
+};
+
+/**
+ * Generates htpasswd file for basic authentication
+ */
+export const generateHtpasswd = async (users: { username: string, password: string }[]): Promise<boolean> => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/nginx/htpasswd`, {
+      users
+    });
+    return response.data.success === true;
+  } catch (error) {
+    console.error("Error generating htpasswd file:", error);
+    throw new Error("Failed to generate htpasswd file");
+  }
+};

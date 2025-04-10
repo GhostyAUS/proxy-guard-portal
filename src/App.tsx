@@ -16,6 +16,11 @@ import LogsPage from "./pages/LogsPage";
 import { LogsProvider } from "./contexts/LogsContext";
 import { WhitelistGroupsProvider } from "./hooks/useWhitelistGroups";
 
+// Set up API base URL from environment variables
+if (!process.env.API_BASE_URL) {
+  console.warn("API_BASE_URL is not set. Using default /api path.");
+}
+
 const queryClient = new QueryClient();
 
 const App = () => (
