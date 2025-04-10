@@ -1,5 +1,5 @@
 
-import { WhitelistGroup } from "@/types/proxy";
+import { WhitelistGroup, NginxStatus } from "@/types/proxy";
 import axios from "axios";
 
 // API endpoint for nginx operations
@@ -64,6 +64,19 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   
   console.log("Generated nginx config successfully");
   return config;
+};
+
+/**
+ * Test if the Nginx config file is writable
+ */
+export const testConfigWritable = async (): Promise<boolean> => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/nginx/config-writable`);
+    return response.data.writable === true;
+  } catch (error) {
+    console.error("Error testing config writability:", error);
+    return false;
+  }
 };
 
 /**
@@ -258,3 +271,4 @@ http {
         }
     }
 }`;
+

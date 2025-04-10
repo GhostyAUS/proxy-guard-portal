@@ -30,3 +30,15 @@ export interface NginxStatus {
   lastModified: string;
   configWritable: boolean;
 }
+
+export interface ProxySettings {
+  httpPort: number;
+  httpsPort: number;
+  maxUploadSize: string;
+  sslCertPath: string;
+  logLevel: string;
+  enableAuthentication: boolean;
+  authUsers?: { username: string; password: string }[];
+  enableIPv6: boolean;
+  dnsResolvers: string[];
+}

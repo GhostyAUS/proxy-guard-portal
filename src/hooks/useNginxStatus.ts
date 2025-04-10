@@ -49,13 +49,13 @@ export function useNginxStatus() {
     }
   }, [fetchStatus]);
 
+  // Create a return object format that matches what the components expect
   return {
-    status,
-    loading,
+    data: status,
+    isLoading: loading,
     error,
     fetchStatus,
-    restartNginx
+    restartNginx,
+    refetch: fetchStatus
   };
 }
-
-export default useNginxStatus;

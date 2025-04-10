@@ -1,6 +1,6 @@
 
 import axios from "axios";
-import { WhitelistGroup } from "@/types/proxy";
+import { WhitelistGroup, ProxySettings } from "@/types/proxy";
 
 // API base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -20,6 +20,17 @@ export const fetchWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
     return response.data;
   } catch (error) {
     console.error("Error fetching whitelist groups:", error);
+    throw error;
+  }
+};
+
+// Fetch proxy settings
+export const fetchProxySettings = async (): Promise<ProxySettings> => {
+  try {
+    const response = await api.get("/settings");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching proxy settings:", error);
     throw error;
   }
 };
