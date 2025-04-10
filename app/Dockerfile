@@ -38,13 +38,23 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
 
 # Create a minimal start script if it doesn't exist
-RUN if ! grep -q "\"start\":" package.json; then \
+RUN echo "Checking package.json for start script:" && \
+    cat package.json | grep -A 10 "\"scripts\"" || echo "No scripts section found" && \
+    if ! grep -q "\"start\":" package.json; then \
       echo "Adding start script to package.json" && \
-      sed -i 's/"scripts": {/"scripts": {\n    "start": "vite preview --host 0.0.0.0 --port 3000",/' package.json; \
+      sed -i 's/"scripts": {/"scripts": {\n    "start": "vite preview --host 0.0.0.0 --port 3000",/' package.json || \
+      (echo "Failed to add start script with sed, creating manually" && \
+       if ! grep -q "\"scripts\"" package.json; then \
+         echo "No scripts section found, creating one" && \
+         sed -i 's/^{/{\n  "scripts": {\n    "start": "vite preview --host 0.0.0.0 --port 3000"\n  },/' package.json; \
+       else \
+         echo "Scripts section exists but no start script, adding one" && \
+         sed -i '/"scripts": {/a \    "start": "vite preview --host 0.0.0.0 --port 3000",' package.json; \
+       fi); \
     fi
 
-# Make sure the start script is available
-RUN cat package.json | grep -A 5 "scripts"
+# Make sure the start script is available and show final package.json
+RUN echo "Final package.json content:" && cat package.json
 
 # Expose port
 EXPOSE 3000
