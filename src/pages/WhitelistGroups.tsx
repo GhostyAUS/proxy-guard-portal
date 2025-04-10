@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react";
+import { ArrowUpDown, Edit, Plus, Trash, RefreshCw } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -15,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/layout/Layout";
 import { WhitelistGroup } from "@/types/proxy";
-import { mockWhitelistGroups } from "@/utils/mockData";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
@@ -32,7 +32,7 @@ import { useWhitelistGroups } from "@/hooks/useWhitelistGroups";
 
 export default function WhitelistGroups() {
   const location = useLocation();
-  const { groups, addGroup, updateGroup, deleteGroup: removeGroup } = useWhitelistGroups();
+  const { groups, isLoading, error, addGroup, updateGroup, deleteGroup: removeGroup, fetchGroups } = useWhitelistGroups();
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteGroupItem, setDeleteGroupItem] = useState<WhitelistGroup | null>(null);
 
@@ -91,6 +91,11 @@ export default function WhitelistGroups() {
     }
   };
 
+  const handleRefresh = () => {
+    toast.info("Refreshing whitelist groups...");
+    fetchGroups();
+  };
+
   const filteredGroups = groups.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -101,11 +106,16 @@ export default function WhitelistGroups() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Whitelist Groups</h1>
-          <Button asChild>
-            <Link to="/whitelist/create">
-              <Plus className="mr-2 h-4 w-4" /> Create Group
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleRefresh}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+            </Button>
+            <Button asChild>
+              <Link to="/whitelist/create">
+                <Plus className="mr-2 h-4 w-4" /> Create Group
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -124,77 +134,95 @@ export default function WhitelistGroups() {
                 className="max-w-sm"
               />
             </div>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[300px]">
-                      <div className="flex items-center gap-1">
-                        Name
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="hidden md:table-cell">Status</TableHead>
-                    <TableHead className="hidden md:table-cell">Clients</TableHead>
-                    <TableHead className="hidden md:table-cell">Destinations</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredGroups.map((group) => (
-                    <TableRow key={group.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{group.name}</span>
-                          {group.description && (
-                            <span className="text-xs text-muted-foreground hidden md:block">
-                              {group.description}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex items-center space-x-2">
-                          <Switch 
-                            checked={group.enabled} 
-                            onCheckedChange={() => handleToggleGroup(group.id)} 
-                          />
-                          <Badge variant={group.enabled ? "default" : "outline"}>
-                            {group.enabled ? "Enabled" : "Disabled"}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">{group.clients.length}</TableCell>
-                      <TableCell className="hidden md:table-cell">{group.destinations.length}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="icon" asChild>
-                            <Link to={`/whitelist/${group.id}`}>
-                              <Edit className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
-                            className="text-destructive"
-                            onClick={() => handleDeleteGroup(group)}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredGroups.length === 0 && (
+            
+            {isLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <span className="ml-2">Loading whitelist groups...</span>
+              </div>
+            ) : error ? (
+              <div className="rounded-md bg-destructive/10 p-4 text-center">
+                <p className="text-destructive">{error}</p>
+                <Button 
+                  variant="outline" 
+                  className="mt-2"
+                  onClick={handleRefresh}
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
-                        No whitelist groups found.
-                      </TableCell>
+                      <TableHead className="w-[300px]">
+                        <div className="flex items-center gap-1">
+                          Name
+                          <ArrowUpDown className="h-3 w-3" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="hidden md:table-cell">Status</TableHead>
+                      <TableHead className="hidden md:table-cell">Clients</TableHead>
+                      <TableHead className="hidden md:table-cell">Destinations</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredGroups.length > 0 ? filteredGroups.map((group) => (
+                      <TableRow key={group.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span>{group.name}</span>
+                            {group.description && (
+                              <span className="text-xs text-muted-foreground hidden md:block">
+                                {group.description}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex items-center space-x-2">
+                            <Switch 
+                              checked={group.enabled} 
+                              onCheckedChange={() => handleToggleGroup(group.id)} 
+                            />
+                            <Badge variant={group.enabled ? "default" : "outline"}>
+                              {group.enabled ? "Enabled" : "Disabled"}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">{group.clients.length}</TableCell>
+                        <TableCell className="hidden md:table-cell">{group.destinations.length}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="icon" asChild>
+                              <Link to={`/whitelist/${group.id}`}>
+                                <Edit className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="text-destructive"
+                              onClick={() => handleDeleteGroup(group)}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                          No whitelist groups found.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

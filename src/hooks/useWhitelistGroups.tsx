@@ -35,14 +35,40 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
     setError(null);
     try {
       console.log("Fetching whitelist groups from API...");
-      const response = await axios.get(`${API_BASE_URL}/whitelist-groups`);
+      
+      // Make API request with some additional options to prevent HTML responses
+      const response = await axios.get(`${API_BASE_URL}/whitelist-groups`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        validateStatus: status => status < 500 // Don't throw for 4xx responses
+      });
+      
       console.log("Whitelist groups response:", response.data);
       
       if (response.data && Array.isArray(response.data.groups)) {
         setGroups(response.data.groups);
+      } else if (response.data && typeof response.data === 'object' && !Array.isArray(response.data.groups)) {
+        console.warn("API response format unexpected:", response.data);
+        setGroups([]);
+        
+        // Try to extract groups if possible
+        if (Object.keys(response.data).length > 0) {
+          const possibleGroups = response.data.groups || [];
+          if (Array.isArray(possibleGroups)) {
+            setGroups(possibleGroups);
+          }
+        }
       } else {
         console.warn("API response format unexpected:", response.data);
         setGroups([]);
+        
+        // Fallback to mock data if API fails
+        import('@/utils/mockData').then(module => {
+          console.log("Using mock whitelist groups data");
+          setGroups(module.mockWhitelistGroups);
+        });
       }
     } catch (err) {
       console.error("Error fetching whitelist groups:", err);
@@ -53,7 +79,7 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       
       // Fallback to mock data if API fails
       import('@/utils/mockData').then(module => {
-        console.log("Using mock whitelist groups data");
+        console.log("Using mock whitelist groups data due to error");
         setGroups(module.mockWhitelistGroups);
       });
     } finally {
@@ -111,7 +137,12 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
       console.log("Adding new whitelist group:", newGroup);
       
       // Send to API
-      const response = await axios.post(`${API_BASE_URL}/whitelist-groups`, newGroup);
+      const response = await axios.post(`${API_BASE_URL}/whitelist-groups`, newGroup, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      });
       
       if (response.data && response.data.success) {
         // Update local state with the returned group or the one we created
@@ -119,11 +150,29 @@ export const WhitelistGroupsProvider = ({ children }: { children: ReactNode }) =
         setGroups(prevGroups => [...prevGroups, returnedGroup]);
         
         // Update NGINX configuration
-        await generateAndSaveNginxConfig([...groups, returnedGroup]);
+        const { generateNginxConfig, DEFAULT_NGINX_TEMPLATE } = await import('@/utils/nginxUtils');
+        const updatedGroups = [...groups, returnedGroup];
+        const newConfig = generateNginxConfig(updatedGroups, DEFAULT_NGINX_TEMPLATE);
         
-        toast.success("Whitelist group created", {
-          description: `${returnedGroup.name} has been created successfully`
-        });
+        try {
+          console.log("Saving NGINX configuration...");
+          await axios.post(`${API_BASE_URL}/nginx/save`, {
+            config: newConfig,
+            configPath: '/etc/nginx/nginx.conf'
+          });
+          
+          console.log("Reloading NGINX...");
+          await axios.post(`${API_BASE_URL}/nginx/reload`);
+          
+          toast.success("Whitelist group created", {
+            description: `${returnedGroup.name} has been created successfully`
+          });
+        } catch (nginxErr) {
+          console.error("Error updating NGINX:", nginxErr);
+          toast.warning("Created group but NGINX update failed", {
+            description: "The group was saved but proxy rules weren't updated"
+          });
+        }
         
         return returnedGroup;
       } else {
