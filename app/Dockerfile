@@ -64,6 +64,9 @@ RUN chmod +x /app/setup-permissions.sh
 COPY app/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
+# Create api-server directory for shell-based API
+RUN mkdir -p /app/api-server
+
 # Expose necessary ports
 EXPOSE 3001 8080 8443
 
