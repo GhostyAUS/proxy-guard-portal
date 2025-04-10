@@ -1,4 +1,3 @@
-
 // Server file with CommonJS syntax
 const express = require("express");
 const app = express();
@@ -149,33 +148,13 @@ app.get("/api/whitelist-groups", (req, res) => {
 });
 
 // Create or update a whitelist group
-app.post("/api/whitelist-groups", (req, res) => {
-  const group = req.body;
-  console.log("Received whitelist group update request:", group.id, group.name);
-  console.log("Group details:", JSON.stringify(group, null, 2));
-  
-  if (!group || !group.id) {
-    console.error("Invalid whitelist group data received:", group);
-    return res.status(400).json({ error: "Invalid whitelist group data" });
-  }
-
-  // Check if group exists to update it
-  const existingIndex = whitelistGroups.findIndex(g => g.id === group.id);
-  if (existingIndex >= 0) {
-    whitelistGroups[existingIndex] = group;
-    console.log("Updated existing whitelist group:", group.id);
-  } else {
-    whitelistGroups.push(group);
-    console.log("Added new whitelist group:", group.id);
-  }
-
-  // Update nginx config whenever a whitelist group is created or updated
+const updateNginxConfig = () => {
   try {
     // Generate NGINX config from whitelist groups
     const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
     console.log("Read nginx template file, generating configuration...");
     
-    // Simple implementation of generateNginxConfig
+    // Properly formatted implementation of generateNginxConfig
     const mapBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
       // Generate the client IPs map
       const clientIpsMap = group.clients.map(client => 
@@ -214,6 +193,38 @@ ${destinationsMap}
     console.log("Generated NGINX config with:");
     console.log(`- ${whitelistGroups.filter(g => g.enabled).length} enabled groups`);
     console.log(`- ${accessConditions.split('\n').length} access conditions`);
+    
+    return config;
+  } catch (err) {
+    console.error("Error preparing nginx config:", err);
+    throw err;
+  }
+};
+
+app.post("/api/whitelist-groups", (req, res) => {
+  const group = req.body;
+  console.log("Received whitelist group update request:", group.id, group.name);
+  console.log("Group details:", JSON.stringify(group, null, 2));
+  
+  if (!group || !group.id) {
+    console.error("Invalid whitelist group data received:", group);
+    return res.status(400).json({ error: "Invalid whitelist group data" });
+  }
+
+  // Check if group exists to update it
+  const existingIndex = whitelistGroups.findIndex(g => g.id === group.id);
+  if (existingIndex >= 0) {
+    whitelistGroups[existingIndex] = group;
+    console.log("Updated existing whitelist group:", group.id);
+  } else {
+    whitelistGroups.push(group);
+    console.log("Added new whitelist group:", group.id);
+  }
+
+  // Update nginx config whenever a whitelist group is created or updated
+  try {
+    // Generate NGINX config from whitelist groups
+    const config = updateNginxConfig();
     
     try {
       // Write the config to a file
@@ -277,48 +288,8 @@ app.delete("/api/whitelist-groups/:id", (req, res) => {
     
     // Update nginx config
     try {
-      // Generate NGINX config from whitelist groups (similar to above)
-      const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
-      
-      // Simple implementation of generateNginxConfig
-      const mapBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
-        // Generate the client IPs map
-        const clientIpsMap = group.clients.map(client => 
-          `    ${client.value} 1;`
-        ).join('\n');
-        
-        // Generate the destinations map
-        const destinationsMap = group.destinations.map(dest => 
-          `    ${dest.value} 1;`
-        ).join('\n');
-        
-        return `
-# Group: ${group.name}
-map $remote_addr $client_${group.id} {
-    default 0;
-${clientIpsMap}
-}
-
-map $http_host $dest_${group.id} {
-    default 0;
-${destinationsMap}
-}
-`;
-      }).join('\n');
-      
-      // Generate the access condition for the server block
-      const accessConditions = whitelistGroups.filter(g => g.enabled).map(group => 
-        `        if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
-      ).join('\n');
-      
-      // Replace placeholders in the template
-      let config = nginxConfigTemplate;
-      config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
-      config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
-      
-      console.log("Generated NGINX config after deletion with:");
-      console.log(`- ${whitelistGroups.filter(g => g.enabled).length} enabled groups`);
-      console.log(`- ${accessConditions.split('\n').length} access conditions`);
+      // Generate NGINX config from whitelist groups
+      const config = updateNginxConfig();
       
       try {
         // Write the config to a file
@@ -378,48 +349,8 @@ app.patch("/api/whitelist-groups/:id/toggle", (req, res) => {
   
   // Update nginx config
   try {
-    // Generate NGINX config from whitelist groups (similar to above)
-    const nginxConfigTemplate = fs.readFileSync(path.join(__dirname, '../../nginx/nginx.conf.template'), 'utf8');
-    
-    // Simple implementation of generateNginxConfig
-    const mapBlocks = whitelistGroups.filter(g => g.enabled).map(group => {
-      // Generate the client IPs map
-      const clientIpsMap = group.clients.map(client => 
-        `    ${client.value} 1;`
-      ).join('\n');
-      
-      // Generate the destinations map
-      const destinationsMap = group.destinations.map(dest => 
-        `    ${dest.value} 1;`
-      ).join('\n');
-      
-      return `
-# Group: ${group.name}
-map $remote_addr $client_${group.id} {
-    default 0;
-${clientIpsMap}
-}
-
-map $http_host $dest_${group.id} {
-    default 0;
-${destinationsMap}
-}
-`;
-    }).join('\n');
-    
-    // Generate the access condition for the server block
-    const accessConditions = whitelistGroups.filter(g => g.enabled).map(group => 
-      `        if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
-    ).join('\n');
-    
-    // Replace placeholders in the template
-    let config = nginxConfigTemplate;
-    config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
-    config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
-    
-    console.log("Generated NGINX config after toggle with:");
-    console.log(`- ${whitelistGroups.filter(g => g.enabled).length} enabled groups`);
-    console.log(`- ${accessConditions.split('\n').length} access conditions`);
+    // Generate NGINX config from whitelist groups
+    const config = updateNginxConfig();
     
     try {
       // Write the config to a file
