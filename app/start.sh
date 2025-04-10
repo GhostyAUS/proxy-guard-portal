@@ -12,8 +12,8 @@ if [ -f "/app/server/index.cjs" ]; then
   API_PID=$!
   echo "API server started with PID: $API_PID"
   
-  # Check if process is actually running
-  if ps -p $API_PID > /dev/null; then
+  # Check if process is running using /proc directory (works in Alpine)
+  if [ -d "/proc/$API_PID" ]; then
     echo "API server running successfully"
   else
     echo "ERROR: API server failed to start properly"

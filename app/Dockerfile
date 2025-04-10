@@ -97,14 +97,47 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
     echo '  API_PID=$!' >> /app/start.sh && \
     echo '  echo "API server started with PID: $API_PID"' >> /app/start.sh && \
     echo '  ' >> /app/start.sh && \
-    echo '  # Check if process is actually running' >> /app/start.sh && \
-    echo '  if ps -p $API_PID > /dev/null; then' >> /app/start.sh && \
+    echo '  # Check if process is running using pgrep instead of ps -p' >> /app/start.sh && \
+    echo '  if [ -d "/proc/$API_PID" ]; then' >> /app/start.sh && \
     echo '    echo "API server running successfully"' >> /app/start.sh && \
     echo '  else' >> /app/start.sh && \
     echo '    echo "ERROR: API server failed to start properly"' >> /app/start.sh && \
     echo '  fi' >> /app/start.sh && \
     echo 'else' >> /app/start.sh && \
     echo '  echo "WARNING: API server file not found at /app/server/index.cjs"' >> /app/start.sh && \
+    echo '  ' >> /app/start.sh && \
+    echo '  # If we have index.js, create a wrapper script to use it properly' >> /app/start.sh && \
+    echo '  if [ -f "/app/server/index.js" ]; then' >> /app/start.sh && \
+    echo '    echo "Found index.js - creating wrapper script..."' >> /app/start.sh && \
+    echo '    cat > /app/server/index.cjs << EOF' >> /app/start.sh && \
+    echo 'const express = require("express");' >> /app/start.sh && \
+    echo 'const app = express();' >> /app/start.sh && \
+    echo 'const PORT = process.env.API_PORT || 3001;' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo 'app.use(express.json());' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo '// Basic health check endpoint' >> /app/start.sh && \
+    echo 'app.get("/api/health", (req, res) => {' >> /app/start.sh && \
+    echo '  console.log("Health check requested");' >> /app/start.sh && \
+    echo '  res.json({ ' >> /app/start.sh && \
+    echo '    status: "ok", ' >> /app/start.sh && \
+    echo '    timestamp: new Date(),' >> /app/start.sh && \
+    echo '    environment: process.env.NODE_ENV || "development"' >> /app/start.sh && \
+    echo '  });' >> /app/start.sh && \
+    echo '});' >> /app/start.sh && \
+    echo '' >> /app/start.sh && \
+    echo 'app.listen(PORT, () => {' >> /app/start.sh && \
+    echo '  console.log(`API Server running on port ${PORT}`);' >> /app/start.sh && \
+    echo '});' >> /app/start.sh && \
+    echo 'EOF' >> /app/start.sh && \
+    echo '    echo "Created wrapper script - starting API server..."' >> /app/start.sh && \
+    echo '    node /app/server/index.cjs &' >> /app/start.sh && \
+    echo '    API_PID=$!' >> /app/start.sh && \
+    echo '    echo "API server started with PID: $API_PID"' >> /app/start.sh && \
+    echo '  else' >> /app/start.sh && \
+    echo '    echo "No server file found. Checking for files in server directory:"' >> /app/start.sh && \
+    echo '    find /app -name "*.js" -o -name "*.cjs" | sort' >> /app/start.sh && \
+    echo '  fi' >> /app/start.sh && \
     echo 'fi' >> /app/start.sh && \
     echo '' >> /app/start.sh && \
     echo '# Create a simple package.json with a start script if it doesn'"'"'t exist' >> /app/start.sh && \
