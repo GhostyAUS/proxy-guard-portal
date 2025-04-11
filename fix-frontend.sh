@@ -16,8 +16,8 @@ cat > /opt/proxyguard/start-frontend.js << 'EOL'
 /**
  * ProxyGuard Static Frontend Server
  * 
- * A simplified static file server for the frontend application
- * that avoids React Router complexities during server-side execution
+ * A simplified static file server that serves only the built frontend files
+ * without any routing complexity
  */
 
 import express from 'express';
@@ -43,25 +43,25 @@ if (!fs.existsSync(STATIC_FILES_PATH)) {
 // Create Express app
 const app = express();
 
-// Logging middleware
+// Basic request logging
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
 // Serve static files from the React app build directory
 app.use(express.static(STATIC_FILES_PATH));
 
-// Return index.html for all routes to support client-side routing
+// For all routes, return index.html - essential for SPA routing
 app.get('*', (req, res) => {
-  console.log(`Serving index.html for path: ${req.url}`);
   res.sendFile(path.join(STATIC_FILES_PATH, 'index.html'));
 });
 
 // Start the server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`ProxyGuard static file server running on port ${PORT} (all interfaces)`);
+  console.log(`ProxyGuard static file server running on port ${PORT}`);
   console.log(`Serving files from: ${STATIC_FILES_PATH}`);
+  console.log('Frontend UI is now available at http://[server-ip]:3000');
 });
 EOL
 
@@ -71,7 +71,7 @@ echo "File created and made executable."
 
 # Restart the service
 echo "Restarting the frontend service..."
-systemctl restart proxyguard-frontend.service
+systemctl restart proxyguard-frontend.service || echo "Warning: Failed to restart frontend service. You may need to restart it manually."
 
 echo "Done! The ProxyGuard frontend service should now be running."
 echo "You can check its status with: systemctl status proxyguard-frontend.service"

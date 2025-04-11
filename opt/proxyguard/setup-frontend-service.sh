@@ -13,6 +13,10 @@ if [ ! -f "/opt/proxyguard/start-frontend.js" ]; then
 else
   echo "Frontend script found. Making it executable..."
   chmod +x /opt/proxyguard/start-frontend.js
+  
+  # Ensure the script has the latest content
+  echo "Updating the frontend script with the latest version..."
+  bash /opt/proxyguard/fix-frontend.sh
 fi
 
 # Install the frontend service
