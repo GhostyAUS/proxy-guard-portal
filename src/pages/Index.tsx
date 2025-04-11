@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { 
   ArrowRight, 
@@ -11,20 +12,29 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layout } from "@/components/layout/Layout";
-import { mockWhitelistGroups, mockNginxStatus } from "@/utils/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DashboardLogSection } from "@/components/logs/DashboardLogSection";
+import { useProxy } from "@/contexts/ProxyContext";
 
 export default function Dashboard() {
-  const [whitelistGroups] = useState(mockWhitelistGroups);
-  const [nginxStatus] = useState(mockNginxStatus);
+  const { whitelistGroups, nginxStatus, isLoading } = useProxy();
 
   useEffect(() => {
     document.title = "Dashboard | Proxy Guard";
   }, []);
 
   const activeGroups = whitelistGroups.filter(group => group.enabled).length;
+  
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    );
+  }
   
   return (
     <Layout>

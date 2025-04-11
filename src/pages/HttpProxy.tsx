@@ -1,22 +1,34 @@
-import { useState, useEffect } from "react";
+
+import { useEffect } from "react";
 import { ArrowRight, CheckCircle2, Server, XCircle } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { mockWhitelistGroups, mockNginxStatus } from "@/utils/mockData";
 import { Link } from "react-router-dom";
+import { useProxy } from "@/contexts/ProxyContext";
 
 export default function HttpProxy() {
-  const [whitelistGroups] = useState(mockWhitelistGroups);
-  const [nginxStatus] = useState(mockNginxStatus);
+  const { whitelistGroups, nginxStatus, proxySettings, isLoading, checkStatus } = useProxy();
   
   useEffect(() => {
     document.title = "HTTP Proxy | Proxy Guard";
-  }, []);
+    // Check status when page loads
+    checkStatus();
+  }, [checkStatus]);
   
   const activeGroups = whitelistGroups.filter(group => group.enabled);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -27,7 +39,7 @@ export default function HttpProxy() {
           <Card>
             <CardHeader>
               <CardTitle>HTTP Proxy Status</CardTitle>
-              <CardDescription>HTTP forward proxy on port 8080</CardDescription>
+              <CardDescription>HTTP forward proxy on port {proxySettings.proxyPort}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2">
@@ -49,7 +61,7 @@ export default function HttpProxy() {
                 <ul className="space-y-2 text-sm">
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Listening Port:</span>
-                    <span className="font-mono">8080</span>
+                    <span className="font-mono">{proxySettings.proxyPort}</span>
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Network Mode:</span>
@@ -75,7 +87,7 @@ export default function HttpProxy() {
                   <Server className="h-4 w-4 text-green-500" />
                   <AlertTitle>Proxy is active</AlertTitle>
                   <AlertDescription>
-                    HTTP proxy is running on host network and accepting connections on port 8080.
+                    HTTP proxy is running on host network and accepting connections on port {proxySettings.proxyPort}.
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -172,7 +184,7 @@ export default function HttpProxy() {
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Port:</span>
-                    <span className="font-mono">8080</span>
+                    <span className="font-mono">{proxySettings.proxyPort}</span>
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Network Mode:</span>
@@ -187,15 +199,15 @@ export default function HttpProxy() {
                 <div className="rounded-md border p-3">
                   <h4 className="text-xs font-medium mb-1">Command Line (curl)</h4>
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                    curl -x http://your-server-ip:8080 https://example.com
+                    curl -x http://your-server-ip:{proxySettings.proxyPort} https://example.com
                   </pre>
                 </div>
                 
                 <div className="rounded-md border p-3">
                   <h4 className="text-xs font-medium mb-1">Environment Variables</h4>
                   <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                    export HTTP_PROXY=http://your-server-ip:8080
-                    export HTTPS_PROXY=http://your-server-ip:8080
+                    export HTTP_PROXY=http://your-server-ip:{proxySettings.proxyPort}
+                    export HTTPS_PROXY=http://your-server-ip:{proxySettings.proxyPort}
                   </pre>
                 </div>
                 

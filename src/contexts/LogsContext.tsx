@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { LogEntry, LogStats } from "@/types/logs";
-import { mockLogs, mockLogStats } from "@/utils/mockLogs";
+import { readLogsFromFile, getLogStats, writeLogEntry } from "@/utils/productionLogs";
 import { v4 as uuidv4 } from 'uuid';
 
 interface LogsContextType {
@@ -20,18 +20,30 @@ const LogsContext = createContext<LogsContextType | undefined>(undefined);
 
 export function LogsProvider({ children }: { children: ReactNode }) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [stats, setStats] = useState<LogStats>(mockLogStats);
+  const [stats, setStats] = useState<LogStats>({
+    totalRequests: 0,
+    allowedRequests: 0,
+    deniedRequests: 0,
+    topClients: [],
+    topDestinations: [],
+    lastUpdated: new Date().toISOString()
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRealTimeEnabled, setIsRealTimeEnabled] = useState(false);
   const [updateInterval, setUpdateInterval] = useState<number | null>(null);
 
-  const fetchLogs = () => {
+  const fetchLogs = async () => {
     setIsLoading(true);
     try {
-      // In a real implementation, this would be an API call
-      setLogs(mockLogs);
-      setStats(mockLogStats);
+      // Fetch logs from the production data utility
+      const fetchedLogs = await readLogsFromFile();
+      setLogs(fetchedLogs);
+      
+      // Fetch or calculate log statistics
+      const logStats = await getLogStats();
+      setStats(logStats);
+      
       setError(null);
     } catch (err) {
       setError("Failed to fetch logs");
@@ -42,9 +54,10 @@ export function LogsProvider({ children }: { children: ReactNode }) {
   };
 
   const clearLogs = () => {
+    // In a production environment, we might want to archive logs instead of clearing them
+    // For now, we'll just reset the state
     setLogs([]);
     setStats({
-      ...mockLogStats,
       totalRequests: 0,
       allowedRequests: 0,
       deniedRequests: 0,
@@ -54,41 +67,17 @@ export function LogsProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const addRandomLog = () => {
-    const clientIps = ['192.168.1.100', '10.0.0.5', '172.16.0.10', '192.168.1.200', '10.0.0.15'];
-    const destinations = ['google.com', 'github.com', 'example.com', 'microsoft.com', 'netflix.com'];
-    const methods = ['GET', 'POST', 'PUT', 'DELETE'];
-    const status = Math.random() > 0.25 ? 'allowed' : 'denied';
-
-    const newLog: LogEntry = {
-      id: uuidv4(),
-      timestamp: new Date().toISOString(),
-      clientIp: clientIps[Math.floor(Math.random() * clientIps.length)],
-      destination: destinations[Math.floor(Math.random() * destinations.length)],
-      status,
-      reason: status === 'denied' ? 'No matching whitelist rule' : undefined,
-      bytesTransferred: status === 'allowed' ? Math.floor(Math.random() * 100000) : 0,
-      responseTime: status === 'allowed' ? Math.floor(Math.random() * 1000) : 0,
-      method: methods[Math.floor(Math.random() * methods.length)],
-    };
-
-    setLogs(prevLogs => [newLog, ...prevLogs.slice(0, 99)]);
-    
-    // Update stats
-    setStats(prevStats => ({
-      ...prevStats,
-      totalRequests: prevStats.totalRequests + 1,
-      allowedRequests: prevStats.allowedRequests + (status === 'allowed' ? 1 : 0),
-      deniedRequests: prevStats.deniedRequests + (status === 'denied' ? 1 : 0),
-      lastUpdated: new Date().toISOString()
-    }));
+  const addRandomLog = async () => {
+    // In production, we wouldn't add random logs
+    // Instead, we would periodically fetch the latest logs
+    await fetchLogs();
   };
 
   const startRealTimeUpdates = () => {
     setIsRealTimeEnabled(true);
     const interval = window.setInterval(() => {
       addRandomLog();
-    }, 3000);
+    }, 5000); // Fetch every 5 seconds in real-time mode
     setUpdateInterval(interval);
   };
 
