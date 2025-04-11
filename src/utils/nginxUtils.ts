@@ -18,53 +18,109 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   const enabledGroups = groups.filter(g => g.enabled);
   
   // Generate the map blocks for IPs and destinations
-  const mapBlocks = enabledGroups.map(group => {
-    // Generate the client IPs map
-    const clientIpsMap = group.clients.map(client => 
-      `    ${client.value} 1;`
-    ).join('\n');
-    
-    // Generate the destinations map
-    const destinationsMap = group.destinations.map(dest => 
-      `    ${dest.value} 1;`
-    ).join('\n');
-    
-    return `
-# Group: ${group.name}
-map $remote_addr $client_${group.id} {
-    default 0;
+  let mapBlocks = '';
+  let accessConditions = '';
+  
+  if (enabledGroups.length > 0) {
+    // Generate group map blocks
+    mapBlocks = enabledGroups.map(group => {
+      // Generate the client IPs map
+      const clientIpsMap = group.clients.map(client => 
+        `        ${client.value} 1;  # ${client.description || ''}`
+      ).join('\n');
+      
+      // Generate the destinations map
+      const destinationsMap = group.destinations.map(dest => {
+        // Check if the destination is a regex pattern
+        const isRegex = dest.value.includes('*');
+        const destValue = isRegex 
+          ? `"~^.*\\.${dest.value.replace(/\*/g, '').replace(/\./g, '\\.')}$"` 
+          : `"${dest.value}"`;
+        
+        return `        ${destValue} 1;  # ${dest.description || ''}`;
+      }).join('\n');
+      
+      return `
+    # Group ${group.id}: ${group.name}
+    map $remote_addr $group_${group.id} {
+        default 0;
 ${clientIpsMap}
-}
-
-map $http_host $dest_${group.id} {
-    default 0;
+    }
+    
+    map $host $is_${group.id}_url {
+        default 0;
 ${destinationsMap}
-}
-`;
-  }).join('\n');
-  
-  // Generate the access condition for the server block
-  const accessConditions = enabledGroups.map(group => 
-    `    if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
-  ).join('\n');
-  
-  // Always include a default map and condition to handle empty cases
-  const finalMapBlocks = enabledGroups.length > 0 ? mapBlocks : `
-# Default group (no groups enabled)
-map $remote_addr $client_fallback {
-    default 1; # Allow by default when no groups are defined
-}
-
-map $http_host $dest_fallback {
-    default 1; # Allow by default when no groups are defined
-}`;
-
-  const finalAccessConditions = enabledGroups.length > 0 ? accessConditions : 
-    `    if ($client_fallback = 1 && $dest_fallback = 1) { set $allow_access 1; }`;
+    }`;
+    }).join('\n\n');
+    
+    // Generate the map for determining if access is allowed
+    let allowConditions = enabledGroups.map(group => 
+      `        # ${group.name} group with allowed URL\n        "1:1:${enabledGroups.length > 1 ? '~:'.repeat(enabledGroups.length - 1) : ''}" 1;`
+    ).join('\n');
+    
+    // Generate access determination map
+    const groupVars = enabledGroups.map(group => `$group_${group.id}:$is_${group.id}_url`).join(':');
+    
+    accessConditions = `
+    # Determine if access is allowed based on group membership and URL
+    map "${groupVars}" $is_access_allowed {
+${allowConditions}
+        default 0;
+    }
+    
+    # Determine denial reason for logging
+    map "${groupVars}" $deny_reason {
+        "0:${enabledGroups.map(() => '~').join(':')}" "IP not in any whitelisted group";
+${enabledGroups.map((group, idx) => {
+  const pattern = Array(enabledGroups.length * 2).fill('~');
+  pattern[idx * 2] = '1';
+  pattern[idx * 2 + 1] = '0';
+  return `        "${pattern.join(':')}" "URL not allowed for ${group.name} group";`;
+}).join('\n')}
+        default "";
+    }
+    
+    # Variables for logging denied requests
+    map $status $deny_log {
+        ~^4 1;  # Log all 4xx responses
+        default 0;
+    }`;
+  } else {
+    // Default fallbacks when no groups are defined
+    mapBlocks = `
+    # Default group (no groups enabled)
+    map $remote_addr $group_default {
+        default 1; # Allow by default when no groups are defined
+    }
+    
+    map $host $is_default_url {
+        default 1; # Allow by default when no groups are defined
+    }`;
+    
+    accessConditions = `
+    # Default access determination (no groups enabled)
+    map "$group_default:$is_default_url" $is_access_allowed {
+        "1:1" 1;
+        default 0;
+    }
+    
+    # Default denial reason
+    map "$group_default:$is_default_url" $deny_reason {
+        "0:~" "IP not whitelisted";
+        "1:0" "URL not allowed";
+        default "";
+    }
+    
+    # Variables for logging denied requests
+    map $status $deny_log {
+        ~^4 1;  # Log all 4xx responses
+        default 0;
+    }`;
+  }
   
   // Replace placeholders in the template
-  config = config.replace('# PLACEHOLDER:MAP_BLOCKS', finalMapBlocks);
-  config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', finalAccessConditions);
+  config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
+  config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
   
   return config;
 };
@@ -252,75 +308,80 @@ export const executePrivilegedCommand = async (command: string): Promise<{ succe
   }
 };
 
-// Updated nginx combined proxy template with simplified configuration
+// Updated nginx template with the new format
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
-pid /run/nginx.pid;
-error_log /var/log/nginx/error.log info;
+daemon off;
 
 events {
     worker_connections 1024;
 }
 
 http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-    
     log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent" "$http_x_forwarded_for"';
+                     '$status $body_bytes_sent "$http_referer" '
+                     '"$http_user_agent" "$http_x_forwarded_for"';
+    log_format denied '$remote_addr - [$time_local] "$request" '
+                      '$status "$http_user_agent" "$http_referer" '
+                      'Host: "$host" URI: "$request_uri" '
+                      'Client: "$remote_addr" '
+                      'Reason: "$deny_reason"';
     
     access_log /var/log/nginx/access.log main;
+    error_log /var/log/nginx/error.log info;
+    access_log /var/log/nginx/denied.log denied if=$deny_log;
     
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    types_hash_max_size 2048;
-    
-    # SSL Settings
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
-    
-    # Define variables for access control
-    map $remote_addr $allow_access {
-        default 0;
-    }
+    #==============================================================================
+    # GROUP WHITELIST CONFIGURATION
     
 # PLACEHOLDER:MAP_BLOCKS
+
+# PLACEHOLDER:ACCESS_CONDITIONS
     
     server {
-        listen 8080 ssl;
+        listen 8080;
+        resolver 8.8.8.8 1.1.1.1 ipv6=off;
         
-        # SSL configuration for HTTPS
-        ssl_certificate /etc/nginx/certs/server.crt;
-        ssl_certificate_key /etc/nginx/certs/server.key;
-        
-        # Check if client is allowed to access the requested destination
-# PLACEHOLDER:ACCESS_CONDITIONS
-        
-        # Block access if not allowed
-        if ($allow_access != 1) {
-            return 403 "Access denied";
+        # Access control based on group permissions
+        if ($is_access_allowed = 0) {
+            return 403 "Access denied: Either your IP is not whitelisted or you're not authorized to access this URL.";
         }
         
-        # Forward proxy configuration
-        resolver 8.8.8.8 ipv6=off;
+        # HTTPS CONNECT method handling
+        proxy_connect;
+        proxy_connect_allow all;
+        proxy_connect_connect_timeout 10s;
+        proxy_connect_read_timeout 60s;
+        proxy_connect_send_timeout 60s;
         
-        # HTTP/HTTPS proxy - handles both protocols
+        # Security headers
+        proxy_hide_header Upgrade;
+        proxy_hide_header X-Powered-By;
+        add_header Content-Security-Policy "upgrade-insecure-requests";
+        add_header X-Frame-Options "SAMEORIGIN";
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cache-Control "no-transform" always;
+        add_header Referrer-Policy no-referrer always;
+        add_header X-Robots-Tag none;
+        
+        # HTTP forwarding
         location / {
-            proxy_pass $scheme://$http_host$request_uri;
-            proxy_set_header Host $http_host;
+            # Check group permissions again at location level
+            if ($is_access_allowed = 0) {
+                return 403 "Access denied: Either your IP is not whitelisted or you're not authorized to access this URL.";
+            }
+            
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header Connection "";
+            proxy_pass $scheme://$host$request_uri;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_connect_timeout 60s;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 10s;
             proxy_send_timeout 60s;
             proxy_read_timeout 60s;
-            
-            # HTTPS CONNECT method handling
-            proxy_ssl_server_name on;
-            proxy_ssl_session_reuse on;
         }
     }
 }

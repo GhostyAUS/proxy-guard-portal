@@ -7,7 +7,7 @@ export interface ClientIP {
 
 export interface Destination {
   id: string;
-  value: string; // URL or domain (e.g., example.com or https://example.com)
+  value: string; // URL or domain (e.g., example.com or *.example.com)
   description?: string;
 }
 
@@ -25,6 +25,11 @@ export interface ProxySettings {
   isReadOnly: boolean;
   proxyPort: string; // Combined HTTP/HTTPS port
   authType: 'none' | 'ldap' | 'saml';
+  logSettings?: {
+    accessLogPath: string;
+    errorLogPath: string;
+    deniedLogPath: string;
+  };
   ldapSettings?: {
     serverUrl: string;
     bindDn: string;

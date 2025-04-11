@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpDown, Edit, Plus, Trash } from "lucide-react";
+import { ArrowUpDown, Edit, Plus, Trash, RefreshCw } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/layout/Layout";
 import { WhitelistGroup } from "@/types/proxy";
-import { mockWhitelistGroups } from "@/utils/mockData";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
@@ -29,11 +28,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useProxy } from "@/contexts/ProxyContext";
 
 export default function WhitelistGroups() {
-  const [groups, setGroups] = useState<WhitelistGroup[]>(mockWhitelistGroups);
+  const { whitelistGroups, saveWhitelistGroup, deleteWhitelistGroup, fetchWhitelistGroups, isLoading } = useProxy();
   const [searchQuery, setSearchQuery] = useState("");
-  const [deleteGroup, setDeleteGroup] = useState<WhitelistGroup | null>(null);
+  const [groupToDelete, setGroupToDelete] = useState<WhitelistGroup | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     document.title = "Whitelist Groups | Proxy Guard";
@@ -43,35 +44,46 @@ export default function WhitelistGroups() {
     setSearchQuery(e.target.value);
   };
 
-  const handleToggleGroup = (groupId: string) => {
-    setGroups(groups.map(group => 
-      group.id === groupId ? { ...group, enabled: !group.enabled } : group
-    ));
+  const handleToggleGroup = async (group: WhitelistGroup) => {
+    const updatedGroup = {
+      ...group,
+      enabled: !group.enabled,
+    };
     
-    const group = groups.find(g => g.id === groupId);
-    if (group) {
+    const success = await saveWhitelistGroup(updatedGroup);
+    
+    if (success) {
       toast(
-        group.enabled ? "Group disabled" : "Group enabled", 
-        { description: `${group.name} has been ${group.enabled ? 'disabled' : 'enabled'}` }
+        updatedGroup.enabled ? "Group enabled" : "Group disabled", 
+        { description: `${group.name} has been ${updatedGroup.enabled ? 'enabled' : 'disabled'}` }
       );
+      await fetchWhitelistGroups();
     }
   };
 
   const handleDeleteGroup = (group: WhitelistGroup) => {
-    setDeleteGroup(group);
+    setGroupToDelete(group);
   };
 
-  const confirmDelete = () => {
-    if (deleteGroup) {
-      setGroups(groups.filter(g => g.id !== deleteGroup.id));
-      toast.success(`Group deleted`, { 
-        description: `${deleteGroup.name} has been deleted` 
-      });
-      setDeleteGroup(null);
+  const confirmDelete = async () => {
+    if (groupToDelete) {
+      const success = await deleteWhitelistGroup(groupToDelete.id);
+      if (success) {
+        toast.success(`Group deleted`, { 
+          description: `${groupToDelete.name} has been deleted` 
+        });
+      }
+      setGroupToDelete(null);
     }
   };
 
-  const filteredGroups = groups.filter(group => 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchWhitelistGroups();
+    setRefreshing(false);
+  };
+
+  const filteredGroups = whitelistGroups.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -81,11 +93,17 @@ export default function WhitelistGroups() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Whitelist Groups</h1>
-          <Button asChild>
-            <Link to="/whitelist/create">
-              <Plus className="mr-2 h-4 w-4" /> Create Group
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button asChild>
+              <Link to="/whitelist/create">
+                <Plus className="mr-2 h-4 w-4" /> Create Group
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -121,56 +139,63 @@ export default function WhitelistGroups() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredGroups.map((group) => (
-                    <TableRow key={group.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{group.name}</span>
-                          {group.description && (
-                            <span className="text-xs text-muted-foreground hidden md:block">
-                              {group.description}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex items-center space-x-2">
-                          <Switch 
-                            checked={group.enabled} 
-                            onCheckedChange={() => handleToggleGroup(group.id)} 
-                          />
-                          <Badge variant={group.enabled ? "default" : "outline"}>
-                            {group.enabled ? "Enabled" : "Disabled"}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">{group.clients.length}</TableCell>
-                      <TableCell className="hidden md:table-cell">{group.destinations.length}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="icon" asChild>
-                            <Link to={`/whitelist/${group.id}`}>
-                              <Edit className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
-                            className="text-destructive"
-                            onClick={() => handleDeleteGroup(group)}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </div>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        Loading whitelist groups...
                       </TableCell>
                     </TableRow>
-                  ))}
-                  {filteredGroups.length === 0 && (
+                  ) : filteredGroups.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="h-24 text-center">
                         No whitelist groups found.
                       </TableCell>
                     </TableRow>
+                  ) : (
+                    filteredGroups.map((group) => (
+                      <TableRow key={group.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span>{group.name}</span>
+                            {group.description && (
+                              <span className="text-xs text-muted-foreground hidden md:block">
+                                {group.description}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex items-center space-x-2">
+                            <Switch 
+                              checked={group.enabled} 
+                              onCheckedChange={() => handleToggleGroup(group)} 
+                            />
+                            <Badge variant={group.enabled ? "default" : "outline"}>
+                              {group.enabled ? "Enabled" : "Disabled"}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">{group.clients.length}</TableCell>
+                        <TableCell className="hidden md:table-cell">{group.destinations.length}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="icon" asChild>
+                              <Link to={`/whitelist/${group.id}`}>
+                                <Edit className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="text-destructive"
+                              onClick={() => handleDeleteGroup(group)}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
@@ -179,12 +204,12 @@ export default function WhitelistGroups() {
         </Card>
       </div>
 
-      <AlertDialog open={!!deleteGroup} onOpenChange={() => setDeleteGroup(null)}>
+      <AlertDialog open={!!groupToDelete} onOpenChange={() => setGroupToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will permanently delete the group "{deleteGroup?.name}". 
+              This action will permanently delete the group "{groupToDelete?.name}". 
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

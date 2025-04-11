@@ -10,7 +10,8 @@ import {
   Laptop, 
   Plus, 
   Save, 
-  Trash
+  Trash,
+  AlertCircle
 } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -66,9 +67,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { ClientIP, Destination, WhitelistGroup } from "@/types/proxy";
-import { mockWhitelistGroups } from "@/utils/mockData";
+import { useProxy } from "@/contexts/ProxyContext";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -76,8 +84,13 @@ const formSchema = z.object({
   enabled: z.boolean().default(true),
 });
 
+const ipRegex = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
 const clientSchema = z.object({
-  value: z.string().min(1, "IP/subnet is required"),
+  value: z.string()
+    .min(1, "IP/subnet is required")
+    .refine(value => ipRegex.test(value), {
+      message: "Must be a valid IP address or subnet (e.g., 192.168.1.1 or 10.0.0.0/24)"
+    }),
   description: z.string().optional(),
 });
 
@@ -91,12 +104,19 @@ export default function WhitelistDetail() {
   const navigate = useNavigate();
   const isCreating = id === "create";
   
+  const { 
+    whitelistGroups, 
+    saveWhitelistGroup, 
+    fetchWhitelistGroups 
+  } = useProxy();
+  
   const [group, setGroup] = useState<WhitelistGroup | null>(null);
   const [isEditing, setIsEditing] = useState(isCreating);
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [isAddingDestination, setIsAddingDestination] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [destinationToDelete, setDestinationToDelete] = useState<string | null>(null);
+  const [showWildcardHelp, setShowWildcardHelp] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -130,7 +150,7 @@ export default function WhitelistDetail() {
     
     if (!isCreating && id) {
       // Find the group with the matching ID
-      const foundGroup = mockWhitelistGroups.find(g => g.id === id);
+      const foundGroup = whitelistGroups.find(g => g.id === id);
       if (foundGroup) {
         setGroup(foundGroup);
         form.reset({
@@ -143,9 +163,9 @@ export default function WhitelistDetail() {
         navigate("/whitelist");
       }
     }
-  }, [id, isCreating, navigate, form]);
+  }, [id, isCreating, navigate, form, whitelistGroups]);
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (isCreating) {
       const newGroup: WhitelistGroup = {
         id: `group-${Date.now()}`,
@@ -156,10 +176,13 @@ export default function WhitelistDetail() {
         destinations: [],
       };
       
-      setGroup(newGroup);
-      toast.success("Group created successfully");
-      navigate(`/whitelist/${newGroup.id}`);
-      setIsEditing(false);
+      const success = await saveWhitelistGroup(newGroup);
+      if (success) {
+        setGroup(newGroup);
+        await fetchWhitelistGroups();
+        navigate(`/whitelist/${newGroup.id}`);
+        setIsEditing(false);
+      }
     } else if (group) {
       const updatedGroup = {
         ...group,
@@ -168,13 +191,16 @@ export default function WhitelistDetail() {
         enabled: values.enabled,
       };
       
-      setGroup(updatedGroup);
-      setIsEditing(false);
-      toast.success("Group updated successfully");
+      const success = await saveWhitelistGroup(updatedGroup);
+      if (success) {
+        setGroup(updatedGroup);
+        await fetchWhitelistGroups();
+        setIsEditing(false);
+      }
     }
   };
   
-  const addClient = (values: z.infer<typeof clientSchema>) => {
+  const addClient = async (values: z.infer<typeof clientSchema>) => {
     if (group) {
       const newClient: ClientIP = {
         id: `client-${Date.now()}`,
@@ -182,18 +208,22 @@ export default function WhitelistDetail() {
         description: values.description || undefined,
       };
       
-      setGroup({
+      const updatedGroup = {
         ...group,
         clients: [...group.clients, newClient],
-      });
+      };
       
-      setIsAddingClient(false);
-      clientForm.reset();
-      toast.success("Client added successfully");
+      const success = await saveWhitelistGroup(updatedGroup);
+      if (success) {
+        setGroup(updatedGroup);
+        await fetchWhitelistGroups();
+        setIsAddingClient(false);
+        clientForm.reset();
+      }
     }
   };
   
-  const addDestination = (values: z.infer<typeof destinationSchema>) => {
+  const addDestination = async (values: z.infer<typeof destinationSchema>) => {
     if (group) {
       const newDestination: Destination = {
         id: `dest-${Date.now()}`,
@@ -201,38 +231,50 @@ export default function WhitelistDetail() {
         description: values.description || undefined,
       };
       
-      setGroup({
+      const updatedGroup = {
         ...group,
         destinations: [...group.destinations, newDestination],
-      });
+      };
       
-      setIsAddingDestination(false);
-      destinationForm.reset();
-      toast.success("Destination added successfully");
+      const success = await saveWhitelistGroup(updatedGroup);
+      if (success) {
+        setGroup(updatedGroup);
+        await fetchWhitelistGroups();
+        setIsAddingDestination(false);
+        destinationForm.reset();
+      }
     }
   };
 
-  const deleteClient = (clientId: string) => {
+  const deleteClient = async (clientId: string) => {
     if (group) {
-      setGroup({
+      const updatedGroup = {
         ...group,
         clients: group.clients.filter(client => client.id !== clientId),
-      });
+      };
       
-      setClientToDelete(null);
-      toast.success("Client removed successfully");
+      const success = await saveWhitelistGroup(updatedGroup);
+      if (success) {
+        setGroup(updatedGroup);
+        await fetchWhitelistGroups();
+        setClientToDelete(null);
+      }
     }
   };
   
-  const deleteDestination = (destId: string) => {
+  const deleteDestination = async (destId: string) => {
     if (group) {
-      setGroup({
+      const updatedGroup = {
         ...group,
         destinations: group.destinations.filter(dest => dest.id !== destId),
-      });
+      };
       
-      setDestinationToDelete(null);
-      toast.success("Destination removed successfully");
+      const success = await saveWhitelistGroup(updatedGroup);
+      if (success) {
+        setGroup(updatedGroup);
+        await fetchWhitelistGroups();
+        setDestinationToDelete(null);
+      }
     }
   };
 
@@ -270,7 +312,7 @@ export default function WhitelistDetail() {
                       <FormItem>
                         <FormLabel>Group Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter group name" {...field} />
+                          <Input placeholder="Enter group name (e.g., WSUS Server, RHEL Repository)" {...field} />
                         </FormControl>
                         <FormDescription>
                           A descriptive name for this whitelist group
@@ -288,7 +330,7 @@ export default function WhitelistDetail() {
                         <FormLabel>Description</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Enter group description"
+                            placeholder="Enter group description (e.g., Allow access to Windows Update servers)"
                             rows={3}
                             {...field}
                           />
@@ -544,7 +586,27 @@ export default function WhitelistDetail() {
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle>Destination URLs</CardTitle>
+                  <div className="flex items-center space-x-2">
+                    <CardTitle>Destination URLs</CardTitle>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowWildcardHelp(!showWildcardHelp)}
+                          >
+                            <AlertCircle className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">
+                            Click for help with wildcard domain patterns
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <Button onClick={() => setIsAddingDestination(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Destination
@@ -554,7 +616,23 @@ export default function WhitelistDetail() {
                   URLs or domains that clients in this group are allowed to access
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {showWildcardHelp && (
+                  <Alert>
+                    <AlertTitle className="flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      How to use wildcard domains
+                    </AlertTitle>
+                    <AlertDescription>
+                      <ul className="list-disc pl-5 pt-2 space-y-1">
+                        <li>Use <code className="bg-muted p-1 rounded">example.com</code> for a specific domain</li>
+                        <li>Use <code className="bg-muted p-1 rounded">*.example.com</code> to match all subdomains</li>
+                        <li>Use <code className="bg-muted p-1 rounded">~^.*\.example\.com$</code> for regex patterns</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -636,7 +714,7 @@ export default function WhitelistDetail() {
                     <FormLabel>Description (Optional)</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="e.g., Marketing Department" 
+                        placeholder="e.g., WSUS Server, DevOps Workstation" 
                         {...field} 
                       />
                     </FormControl>
@@ -682,12 +760,12 @@ export default function WhitelistDetail() {
                     <FormLabel>URL/Domain</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="e.g., example.com or subdomain.example.com" 
+                        placeholder="e.g., example.com or *.microsoft.com" 
                         {...field} 
                       />
                     </FormControl>
                     <FormDescription>
-                      Enter a domain name without protocol (e.g., example.com)
+                      Enter a domain name. You can use wildcard patterns like *.microsoft.com
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -702,7 +780,7 @@ export default function WhitelistDetail() {
                     <FormLabel>Description (Optional)</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="e.g., Corporate Website" 
+                        placeholder="e.g., Microsoft Update Servers" 
                         {...field} 
                       />
                     </FormControl>
@@ -710,6 +788,18 @@ export default function WhitelistDetail() {
                   </FormItem>
                 )}
               />
+
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Domain Pattern Examples</AlertTitle>
+                <AlertDescription>
+                  <ul className="list-disc pl-5 pt-2 space-y-1 text-sm">
+                    <li><code className="bg-muted p-1 rounded">microsoft.com</code> - Matches only microsoft.com</li>
+                    <li><code className="bg-muted p-1 rounded">*.microsoft.com</code> - Matches any subdomain of microsoft.com</li>
+                    <li><code className="bg-muted p-1 rounded">*.windowsupdate.com</code> - Matches all Windows Update domains</li>
+                  </ul>
+                </AlertDescription>
+              </Alert>
               
               <DialogFooter>
                 <Button 
