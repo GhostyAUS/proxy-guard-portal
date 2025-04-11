@@ -14,7 +14,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import DashboardLogSection from "@/components/logs/DashboardLogSection";
 import { useProxy } from "@/contexts/ProxyContext";
 
 export default function Dashboard() {
@@ -117,8 +116,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-
-        <DashboardLogSection />
 
         <h2 className="text-xl font-semibold mt-6">Whitelist Groups</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
