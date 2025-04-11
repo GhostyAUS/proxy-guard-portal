@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DashboardLogSection } from "@/components/logs/DashboardLogSection";
+import DashboardLogSection from "@/components/logs/DashboardLogSection";
 import { useProxy } from "@/contexts/ProxyContext";
 
 export default function Dashboard() {
