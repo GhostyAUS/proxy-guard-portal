@@ -238,7 +238,8 @@ function getDemoWhitelistGroups(): WhitelistGroup[] {
       ],
       destinations: [
         { id: "d1", value: "example.com", description: "Example website" },
-        { id: "d2", value: "api.example.org", description: "API endpoint" }
+        { id: "d2", value: "api.example.org", description: "API endpoint" },
+        { id: "d3", value: "*.google.com", description: "Google services" }
       ]
     },
     {

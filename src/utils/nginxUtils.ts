@@ -370,13 +370,6 @@ http {
         listen 8080;
         resolver 8.8.8.8 1.1.1.1 ipv6=off;
         
-        # HTTPS CONNECT method handling
-        proxy_connect;
-        proxy_connect_allow all;
-        proxy_connect_connect_timeout 10s;
-        proxy_connect_read_timeout 60s;
-        proxy_connect_send_timeout 60s;
-        
         # Security headers
         proxy_hide_header Upgrade;
         proxy_hide_header X-Powered-By;
