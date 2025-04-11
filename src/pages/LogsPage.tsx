@@ -59,6 +59,9 @@ export default function LogsPage() {
     });
   };
 
+  // Feature flag for dashboard logging
+  const dashboardLoggingEnabled = false; // Set to true when dashboard logging is implemented
+
   return (
     <Layout>
       <div className="flex flex-col gap-4">
@@ -78,16 +81,26 @@ export default function LogsPage() {
           filesAvailable={filesAvailable}
         />
 
-        <div className="space-y-4 mt-4">
-          <h2 className="text-xl font-semibold">Access Log Entries</h2>
-          {isLoading ? (
-            <div className="flex justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : (
-            <LogTable logs={logs} />
-          )}
-        </div>
+        {dashboardLoggingEnabled ? (
+          <div className="space-y-4 mt-4">
+            <h2 className="text-xl font-semibold">Access Log Entries</h2>
+            {isLoading ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <LogTable logs={logs} />
+            )}
+          </div>
+        ) : (
+          <div className="bg-muted/50 p-6 rounded-lg mt-4 text-center">
+            <h2 className="text-xl font-semibold mb-2">Log Entries Coming Soon</h2>
+            <p className="text-muted-foreground">
+              Detailed log entries visualization is currently under development. 
+              Check back soon for complete dashboard logging capabilities.
+            </p>
+          </div>
+        )}
       </div>
     </Layout>
   );
