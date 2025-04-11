@@ -48,10 +48,10 @@ ${enabledGroups.map((group) => {
     if ($client_group = "${safeGroupId}") {
         ${group.destinations.map(dest => {
           if (dest.value.includes('*')) {
-            // Handle wildcard domains with regex
+            // Handle wildcard domains with regex - fixed syntax
             const pattern = dest.value.replace(/\*/g, '').replace(/\./g, '\\.');
             return `# ${dest.description || 'Wildcard domain'}
-        if ($host ~ ".*${pattern}$") {
+        if ($host ~ .*${pattern}$) {
             set $allow_${safeGroupId} 1;
         }`;
           } else {
@@ -97,7 +97,7 @@ ${enabledGroups.map(group => {
     # Log file paths
     access_log /var/log/nginx/access.log main;
     error_log /var/log/nginx/error.log info;
-    access_log /var/log/nginx/denied.log denied if=$status ~ ^4;`;
+    access_log /var/log/nginx/denied.log denied;`;
 
     // Proxy settings
     const proxySettings = `
@@ -142,7 +142,7 @@ geo $remote_addr $client_group {
     # Log file paths  
     access_log /var/log/nginx/access.log main;
     error_log /var/log/nginx/error.log info;
-    access_log /var/log/nginx/denied.log denied if=$status ~ ^4;`;
+    access_log /var/log/nginx/denied.log denied;`;
     
     serverLocations = `
     # Default access rule (no groups enabled)
