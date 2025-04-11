@@ -17,7 +17,7 @@ cat > /opt/proxyguard/start-frontend.js << 'EOL'
  * ProxyGuard Static Frontend Server
  * 
  * A simplified static file server that serves only the built frontend files
- * without any routing complexity
+ * without any routing complexity or React Router dependencies
  */
 
 import express from 'express';
@@ -43,16 +43,16 @@ if (!fs.existsSync(STATIC_FILES_PATH)) {
 // Create Express app
 const app = express();
 
-// Basic request logging
+// Basic logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
-// Serve static files from the React app build directory
+// Serve static files from the build directory
 app.use(express.static(STATIC_FILES_PATH));
 
-// For all routes, return index.html - essential for SPA routing
+// For any route, serve the index.html file and let the client handle routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(STATIC_FILES_PATH, 'index.html'));
 });
@@ -61,7 +61,7 @@ app.get('*', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`ProxyGuard static file server running on port ${PORT}`);
   console.log(`Serving files from: ${STATIC_FILES_PATH}`);
-  console.log('Frontend UI is now available at http://[server-ip]:3000');
+  console.log(`Frontend UI available at: http://[server-ip]:${PORT}`);
 });
 EOL
 

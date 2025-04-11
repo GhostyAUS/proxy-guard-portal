@@ -12,8 +12,8 @@ WorkingDirectory=/opt/proxyguard
 ExecStart=/usr/bin/node /opt/proxyguard/start-frontend.js
 Restart=on-failure
 RestartSec=5
-StandardOutput=syslog
-StandardError=syslog
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=proxyguard-frontend
 Environment=NODE_ENV=production PORT=3000
 

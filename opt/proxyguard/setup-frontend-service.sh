@@ -19,6 +19,31 @@ else
   bash /opt/proxyguard/fix-frontend.sh
 fi
 
+# Update the systemd service file to remove deprecated options
+echo "Updating systemd service file..."
+cat > /opt/proxyguard/server/proxyguard-frontend.service << 'EOL'
+[Unit]
+Description=ProxyGuard Frontend Application
+After=network.target proxyguard-api.service
+Requires=proxyguard-api.service
+
+[Service]
+Type=simple
+User=proxyguard
+Group=proxyguard
+WorkingDirectory=/opt/proxyguard
+ExecStart=/usr/bin/node /opt/proxyguard/start-frontend.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=proxyguard-frontend
+Environment=NODE_ENV=production PORT=3000
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
 # Install the frontend service
 echo "Installing systemd service..."
 cp /opt/proxyguard/server/proxyguard-frontend.service /etc/systemd/system/
