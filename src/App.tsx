@@ -23,8 +23,8 @@ function App() {
         <Router>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/http" element={<HttpProxy />} />
-            <Route path="/https" element={<HttpsProxy />} />
+            <Route path="/http-proxy" element={<HttpProxy />} />
+            <Route path="/https-proxy" element={<HttpsProxy />} />
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/whitelist" element={<WhitelistGroups />} />
             <Route path="/whitelist/:id" element={<WhitelistDetail />} />
