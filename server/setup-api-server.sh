@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # ProxyGuard API Proxy Server Setup Script
@@ -110,6 +109,5 @@ sudo systemctl start proxyguard-api.service
 
 echo "====================================================="
 echo "ProxyGuard API Proxy Server installation complete!"
-echo "The API server is running on port 3000"
+echo "The API server is running on port 3001"
 echo "====================================================="
-

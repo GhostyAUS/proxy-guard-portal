@@ -18,7 +18,7 @@ const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 
 // Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001; // Changed default port to 3001
 const COMMAND_SCRIPT_PATH = '/usr/local/bin/proxyguard-exec';
 const WHITELIST_CONFIG_PATH = '/etc/proxyguard/whitelist.json';
 const PROXY_SETTINGS_PATH = '/etc/proxyguard/settings.json';
@@ -305,7 +305,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.resolve(STATIC_FILES_PATH, 'index.html'));
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`ProxyGuard API proxy server running on port ${PORT}`);
+// Start server - bind to all interfaces
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`ProxyGuard API proxy server running on port ${PORT} (all interfaces)`);
 });

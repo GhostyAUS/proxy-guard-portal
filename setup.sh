@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # ProxyGuard Setup Script for Ubuntu Server
@@ -123,7 +122,7 @@ RestartSec=5
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=proxyguard-frontend
-Environment=NODE_ENV=production PORT=3000
+Environment=NODE_ENV=production PORT=3000 HOST=0.0.0.0
 
 [Install]
 WantedBy=multi-user.target
@@ -137,7 +136,8 @@ sudo systemctl start proxyguard-frontend.service
 
 echo "====================================================="
 echo "ProxyGuard installation complete!"
-echo "The application is running at: http://localhost:3000"
+echo "The application is running at: http://server-ip:3000"
+echo "The API server is running on port 3001"
 echo "The proxy server is running on port 8080"
 echo "====================================================="
 echo ""
@@ -146,4 +146,3 @@ echo "- Setting up a proper domain name and SSL certificates"
 echo "- Configuring firewall rules to restrict access"
 echo "- Setting up monitoring and alerts"
 echo "====================================================="
-

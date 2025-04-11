@@ -15,7 +15,7 @@ RestartSec=5
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=proxyguard-api
-Environment=NODE_ENV=production PORT=3000
+Environment=NODE_ENV=production PORT=3001
 
 [Install]
 WantedBy=multi-user.target
