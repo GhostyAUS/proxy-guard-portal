@@ -11,8 +11,11 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   // Start with the base template
   let config = configTemplate;
   
+  // Filter enabled groups
+  const enabledGroups = groups.filter(g => g.enabled);
+  
   // Generate the map blocks for IPs and destinations
-  const mapBlocks = groups.filter(g => g.enabled).map(group => {
+  const mapBlocks = enabledGroups.map(group => {
     // Generate the client IPs map
     const clientIpsMap = group.clients.map(client => 
       `    ${client.value} 1;`
@@ -38,24 +41,23 @@ ${destinationsMap}
   }).join('\n');
   
   // Generate the access condition for the server block
-  const accessConditions = groups.filter(g => g.enabled).map(group => 
+  const accessConditions = enabledGroups.map(group => 
     `    if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
   ).join('\n');
   
-  // Add a default rule if no groups are enabled (to avoid empty if conditions)
-  const finalMapBlocks = mapBlocks || `
-# Default group (no enabled groups)
-map $remote_addr $client_default {
+  // Always include a default map and condition to handle empty cases
+  const finalMapBlocks = enabledGroups.length > 0 ? mapBlocks : `
+# Default group (no groups enabled)
+map $remote_addr $client_fallback {
     default 1; # Allow by default when no groups are defined
 }
 
-map $http_host $dest_default {
+map $http_host $dest_fallback {
     default 1; # Allow by default when no groups are defined
-}
-`;
+}`;
 
-  const finalAccessConditions = accessConditions || 
-    `    if ($client_default = 1 && $dest_default = 1) { set $allow_access 1; }`;
+  const finalAccessConditions = enabledGroups.length > 0 ? accessConditions : 
+    `    if ($client_fallback = 1 && $dest_fallback = 1) { set $allow_access 1; }`;
   
   // Replace placeholders in the template
   config = config.replace('# PLACEHOLDER:MAP_BLOCKS', finalMapBlocks);
@@ -183,9 +185,10 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
   }
 };
 
-// Updated nginx combined proxy template
+// Updated nginx combined proxy template with simplified configuration
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
+pid /run/nginx.pid;
 error_log /var/log/nginx/error.log info;
 
 events {
@@ -193,7 +196,25 @@ events {
 }
 
 http {
-    access_log /var/log/nginx/access.log;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+    
+    access_log /var/log/nginx/access.log main;
+    
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    
+    # SSL Settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
     
     # Define variables for access control
     map $remote_addr $allow_access {
@@ -203,19 +224,14 @@ http {
 # PLACEHOLDER:MAP_BLOCKS
     
     server {
-        listen 8080 ssl http2;
+        listen 8080 ssl;
         
         # SSL configuration for HTTPS
         ssl_certificate /etc/nginx/certs/server.crt;
         ssl_certificate_key /etc/nginx/certs/server.key;
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers HIGH:!aNULL:!MD5;
-        ssl_prefer_server_ciphers on;
-        ssl_session_cache shared:SSL:10m;
-        ssl_session_timeout 10m;
         
         # Check if client is allowed to access the requested destination
-        # PLACEHOLDER:ACCESS_CONDITIONS
+# PLACEHOLDER:ACCESS_CONDITIONS
         
         # Block access if not allowed
         if ($allow_access != 1) {
@@ -227,10 +243,6 @@ http {
         
         # HTTP/HTTPS proxy - handles both protocols
         location / {
-            # Authentication settings (if enabled)
-            auth_basic_user_file /etc/nginx/.htpasswd;
-            
-            # Handle HTTP and HTTPS traffic
             proxy_pass $scheme://$http_host$request_uri;
             proxy_set_header Host $http_host;
             proxy_set_header X-Real-IP $remote_addr;
