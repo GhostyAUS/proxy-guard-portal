@@ -4,16 +4,28 @@ import { WhitelistGroup, ProxySettings, NginxStatus } from "@/types/proxy";
 // Base API URL for server operations - use a relative path to avoid CORS issues
 const API_BASE_URL = '/api';
 
+// Try to get API key from localStorage (set during application startup)
+const getApiKey = () => localStorage.getItem('proxyguard_api_key') || '';
+
+// Helper function to create request headers with API key
+const createHeaders = (additionalHeaders = {}) => {
+  const headers = {
+    ...additionalHeaders,
+    'X-API-Key': getApiKey(),
+  };
+  return headers;
+};
+
 // Function to read whitelist groups from configuration file via the API
 export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
   try {
     console.log('Fetching whitelist groups from API...');
     // Call the API endpoint
     const response = await fetch(`${API_BASE_URL}/whitelist`, {
-      headers: {
+      headers: createHeaders({
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
-      }
+      })
     });
     
     if (!response.ok) {
@@ -37,9 +49,9 @@ export const writeWhitelistGroups = async (groups: WhitelistGroup[]): Promise<bo
     // Call the API endpoint
     const response = await fetch(`${API_BASE_URL}/whitelist`, {
       method: 'POST',
-      headers: {
+      headers: createHeaders({
         'Content-Type': 'application/json',
-      },
+      }),
       body: JSON.stringify(groups),
     });
     
@@ -60,10 +72,10 @@ export const readProxySettings = async (): Promise<ProxySettings> => {
   try {
     // Call the API endpoint
     const response = await fetch(`${API_BASE_URL}/settings`, {
-      headers: {
+      headers: createHeaders({
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
-      }
+      })
     });
     
     if (!response.ok) {
@@ -83,9 +95,9 @@ export const writeProxySettings = async (settings: ProxySettings): Promise<boole
     // Call the API endpoint
     const response = await fetch(`${API_BASE_URL}/settings`, {
       method: 'POST',
-      headers: {
+      headers: createHeaders({
         'Content-Type': 'application/json',
-      },
+      }),
       body: JSON.stringify(settings),
     });
     
@@ -106,10 +118,10 @@ export const checkNginxStatus = async (): Promise<NginxStatus> => {
   try {
     // Call the API endpoint
     const response = await fetch(`${API_BASE_URL}/nginx/status`, {
-      headers: {
+      headers: createHeaders({
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
-      }
+      })
     });
     
     if (!response.ok) {
@@ -129,6 +141,7 @@ export const reloadNginxConfig = async (): Promise<boolean> => {
     // Call the API endpoint
     const response = await fetch(`${API_BASE_URL}/nginx/reload`, {
       method: 'POST',
+      headers: createHeaders(),
     });
     
     if (!response.ok) {
@@ -141,4 +154,28 @@ export const reloadNginxConfig = async (): Promise<boolean> => {
     console.error("Failed to reload Nginx:", error);
     throw error;
   }
+};
+
+// Function to check API health and connection
+export const checkApiHealth = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      headers: createHeaders(),
+    });
+    
+    if (!response.ok) {
+      return false;
+    }
+    
+    await response.json();
+    return true;
+  } catch (error) {
+    console.error("API health check failed:", error);
+    return false;
+  }
+};
+
+// Function to set API key in local storage
+export const setApiKey = (key: string): void => {
+  localStorage.setItem('proxyguard_api_key', key);
 };

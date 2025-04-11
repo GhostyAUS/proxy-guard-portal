@@ -1,4 +1,3 @@
-
 #!/usr/bin/env node
 
 /**
@@ -18,13 +17,22 @@ const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 
 // Configuration
-const PORT = process.env.PORT || 3001; // Changed default port to 3001
+const PORT = process.env.PORT || 3001;
 const COMMAND_SCRIPT_PATH = '/usr/local/bin/proxyguard-exec';
 const WHITELIST_CONFIG_PATH = '/etc/proxyguard/whitelist.json';
 const PROXY_SETTINGS_PATH = '/etc/proxyguard/settings.json';
+const API_KEY_PATH = '/etc/proxyguard/api_key';
 const NGINX_CONFIG_PATH = '/etc/nginx/nginx.conf';
 const LOG_FILE_PATH = '/var/log/proxyguard/access.log';
-const STATIC_FILES_PATH = path.join(__dirname, '../dist');
+
+// Try to read API key from file
+let apiKey = '';
+try {
+  apiKey = fs.readFileSync(API_KEY_PATH, 'utf8').trim();
+} catch (err) {
+  console.warn(`Warning: Could not read API key from ${API_KEY_PATH}. API endpoints will not be protected.`);
+  console.warn('Run generate-api-key.sh to create an API key for security.');
+}
 
 // Create Express app
 const app = express();
@@ -55,8 +63,22 @@ app.use('/api/', apiLimiter);
 // Parse request bodies
 app.use(bodyParser.json());
 
-// Serve static files from the React app
-app.use(express.static(STATIC_FILES_PATH));
+// API key middleware for protected routes
+const requireApiKey = (req, res, next) => {
+  // Skip API key check if no key is configured
+  if (!apiKey) {
+    console.warn('API key authentication is disabled. Configure an API key for security.');
+    return next();
+  }
+  
+  const providedKey = req.headers['x-api-key'];
+  
+  if (!providedKey || providedKey !== apiKey) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  next();
+};
 
 // Helper function to execute system commands
 async function executeCommand(command, args = [], stdin = null) {
@@ -93,7 +115,8 @@ async function executeCommand(command, args = [], stdin = null) {
   });
 }
 
-// API routes
+// API routes - protected with API key
+app.use('/api', requireApiKey);
 
 // Get whitelist groups
 app.get('/api/whitelist', async (req, res) => {
@@ -300,12 +323,13 @@ app.post('/api/system/execute', async (req, res) => {
   }
 });
 
-// All other GET requests not handled will return the React app
-app.get('*', (req, res) => {
-  res.sendFile(path.resolve(STATIC_FILES_PATH, 'index.html'));
+// Endpoint to check API connection and verify API key
+app.get('/api/health', async (req, res) => {
+  res.json({ status: 'ok', version: '1.0.0' });
 });
 
 // Start server - bind to all interfaces
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`ProxyGuard API proxy server running on port ${PORT} (all interfaces)`);
+  console.log(`API authentication is ${apiKey ? 'enabled' : 'disabled'}`);
 });

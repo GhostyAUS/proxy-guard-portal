@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # ProxyGuard Setup Script for Ubuntu Server
@@ -57,6 +58,12 @@ else
   echo "Already in destination directory. Skipping copy."
 fi
 
+# Make scripts executable
+sudo chmod +x $APP_DIR/server/generate-api-key.sh
+sudo chmod +x $APP_DIR/opt/proxyguard/make-frontend-executable.sh
+sudo chmod +x $APP_DIR/opt/proxyguard/setup-frontend-service.sh
+sudo chmod +x $APP_DIR/server/setup-api-server.sh
+
 # Generate self-signed SSL certificates (for development)
 echo "Generating self-signed SSL certificates..."
 sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
@@ -68,6 +75,10 @@ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 # Set proper permissions for certificates
 sudo chmod 600 /etc/nginx/certs/server.key
 sudo chmod 644 /etc/nginx/certs/server.crt
+
+# Generate API key for secure communication
+echo "Generating API key for secure communication..."
+$APP_DIR/server/generate-api-key.sh
 
 # Install command execution script
 echo "Setting up command execution script..."
@@ -103,36 +114,10 @@ cd $APP_DIR/nginx && sudo bash install.sh
 echo "Setting up API proxy server..."
 cd $APP_DIR/server && sudo bash setup-api-server.sh
 
-# Create a service file for the application frontend
-echo "Creating systemd service for the frontend application..."
-cat > /tmp/proxyguard-frontend.service << EOL
-[Unit]
-Description=ProxyGuard Frontend Application
-After=network.target proxyguard-api.service
-Requires=proxyguard-api.service
-
-[Service]
-Type=simple
-User=proxyguard
-Group=proxyguard
-WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/npm run start
-Restart=on-failure
-RestartSec=5
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=proxyguard-frontend
-Environment=NODE_ENV=production PORT=3000 HOST=0.0.0.0
-
-[Install]
-WantedBy=multi-user.target
-EOL
-
-# Install the frontend service
-sudo mv /tmp/proxyguard-frontend.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable proxyguard-frontend.service
-sudo systemctl start proxyguard-frontend.service
+# Set up frontend server
+echo "Setting up frontend server..."
+cd $APP_DIR && sudo bash opt/proxyguard/make-frontend-executable.sh
+cd $APP_DIR && sudo bash opt/proxyguard/setup-frontend-service.sh
 
 echo "====================================================="
 echo "ProxyGuard installation complete!"
