@@ -1,40 +1,42 @@
 
 import { WhitelistGroup, ProxySettings, NginxStatus, ClientIP, Destination } from "@/types/proxy";
 import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'fs';
-import * as util from 'util';
-import { exec } from 'child_process';
 
-// Convert Node.js callback-based functions to Promise-based
-const readFilePromise = util.promisify(fs.readFile);
-const writeFilePromise = util.promisify(fs.writeFile);
-const execPromise = util.promisify(exec);
-const accessPromise = util.promisify(fs.access);
-
-// Configuration
+// Configuration paths (used server-side)
 const WHITELIST_CONFIG_PATH = import.meta.env.VITE_WHITELIST_CONFIG_PATH || '/etc/proxyguard/whitelist.json';
 const PROXY_SETTINGS_PATH = import.meta.env.VITE_PROXY_SETTINGS_PATH || '/etc/proxyguard/settings.json';
 const NGINX_CONFIG_PATH = import.meta.env.VITE_NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
 
-// Check if running in browser environment
-const isBrowser = typeof window !== 'undefined';
+// Base API URL for server operations
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+// Check if running in browser environment - always true in this context
+const isBrowser = true;
 
 // Function to read whitelist groups from configuration file
 export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
   try {
     if (isBrowser) {
-      console.log("Running in browser, would attempt to read from:", WHITELIST_CONFIG_PATH);
-      // In browser environment, use demo data or fetch from API
-      return getDemoWhitelistGroups();
+      // In browser environment, use demo data for development or fetch from API in production
+      if (import.meta.env.DEV) {
+        console.log("Running in dev mode, using demo whitelist groups");
+        return getDemoWhitelistGroups();
+      } else {
+        // In production, call the API
+        const response = await fetch(`${API_BASE_URL}/whitelist`);
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        return await response.json();
+      }
     }
 
-    // Read the whitelist file
-    const data = await readFilePromise(WHITELIST_CONFIG_PATH, 'utf8');
-    return JSON.parse(data);
+    // This code will never run in the browser
+    return getDemoWhitelistGroups();
   } catch (error) {
     console.error("Failed to read whitelist groups:", error);
     
-    // If file doesn't exist or has errors, return default data
+    // If API call fails or in dev mode, return default data
     return getDemoWhitelistGroups();
   }
 };
@@ -43,13 +45,28 @@ export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
 export const writeWhitelistGroups = async (groups: WhitelistGroup[]): Promise<boolean> => {
   try {
     if (isBrowser) {
-      console.log("Running in browser, would write to:", WHITELIST_CONFIG_PATH, groups);
-      // In browser environment, this would call an API
-      return true;
+      if (import.meta.env.DEV) {
+        console.log("Running in dev mode, would write to:", WHITELIST_CONFIG_PATH, groups);
+        return true;
+      } else {
+        // In production, call the API
+        const response = await fetch(`${API_BASE_URL}/whitelist`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(groups),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        return true;
+      }
     }
 
-    // Write the data to file with pretty formatting
-    await writeFilePromise(WHITELIST_CONFIG_PATH, JSON.stringify(groups, null, 2));
+    // This code will never run in the browser
     return true;
   } catch (error) {
     console.error('Failed to write whitelist groups:', error);
@@ -61,13 +78,21 @@ export const writeWhitelistGroups = async (groups: WhitelistGroup[]): Promise<bo
 export const readProxySettings = async (): Promise<ProxySettings> => {
   try {
     if (isBrowser) {
-      console.log("Running in browser, would read from:", PROXY_SETTINGS_PATH);
-      // In browser environment, return default settings
-      return getDefaultProxySettings();
+      if (import.meta.env.DEV) {
+        console.log("Running in dev mode, using default proxy settings");
+        return getDefaultProxySettings();
+      } else {
+        // In production, call the API
+        const response = await fetch(`${API_BASE_URL}/settings`);
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        return await response.json();
+      }
     }
 
-    const data = await readFilePromise(PROXY_SETTINGS_PATH, 'utf8');
-    return JSON.parse(data);
+    // This code will never run in the browser
+    return getDefaultProxySettings();
   } catch (error) {
     console.error("Failed to read proxy settings:", error);
     
@@ -80,11 +105,28 @@ export const readProxySettings = async (): Promise<ProxySettings> => {
 export const writeProxySettings = async (settings: ProxySettings): Promise<boolean> => {
   try {
     if (isBrowser) {
-      console.log("Running in browser, would write to:", PROXY_SETTINGS_PATH, settings);
-      return true;
+      if (import.meta.env.DEV) {
+        console.log("Running in dev mode, would write settings:", settings);
+        return true;
+      } else {
+        // In production, call the API
+        const response = await fetch(`${API_BASE_URL}/settings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(settings),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        return true;
+      }
     }
 
-    await writeFilePromise(PROXY_SETTINGS_PATH, JSON.stringify(settings, null, 2));
+    // This code will never run in the browser
     return true;
   } catch (error) {
     console.error('Failed to write proxy settings:', error);
@@ -96,44 +138,37 @@ export const writeProxySettings = async (settings: ProxySettings): Promise<boole
 export const checkNginxStatus = async (): Promise<NginxStatus> => {
   try {
     if (isBrowser) {
-      console.log("Running in browser, would check Nginx status");
-      // Mock Nginx status in browser environment
-      return {
-        isRunning: true,
-        lastConfigTest: {
-          success: true,
-          message: 'Configuration test successful'
-        },
-        lastModified: new Date().toISOString(),
-        configWritable: true
-      };
+      if (import.meta.env.DEV) {
+        console.log("Running in dev mode, using mock Nginx status");
+        // Mock Nginx status in development environment
+        return {
+          isRunning: true,
+          lastConfigTest: {
+            success: true,
+            message: 'Configuration test successful'
+          },
+          lastModified: new Date().toISOString(),
+          configWritable: true
+        };
+      } else {
+        // In production, call the API
+        const response = await fetch(`${API_BASE_URL}/nginx/status`);
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        return await response.json();
+      }
     }
 
-    // Check if Nginx is running
-    const { stdout: serviceStatus } = await execPromise('sudo systemctl is-active nginx');
-    const isRunning = serviceStatus.trim() === 'active';
-
-    // Check last modified time of the nginx config
-    const { stdout: statOutput } = await execPromise(`stat -c %y ${NGINX_CONFIG_PATH}`);
-    const lastModified = new Date(statOutput.trim()).toISOString();
-
-    // Check if config is writable
-    let configWritable = false;
-    try {
-      await accessPromise(NGINX_CONFIG_PATH, fs.constants.W_OK);
-      configWritable = true;
-    } catch (error) {
-      configWritable = false;
-    }
-
+    // This code will never run in the browser
     return {
-      isRunning,
+      isRunning: false,
       lastConfigTest: {
-        success: true,
-        message: 'Configuration test successful'
+        success: false,
+        message: 'Failed to test configuration'
       },
-      lastModified,
-      configWritable
+      lastModified: new Date().toISOString(),
+      configWritable: false
     };
   } catch (error) {
     console.error("Failed to check Nginx status:", error);
@@ -154,11 +189,24 @@ export const checkNginxStatus = async (): Promise<NginxStatus> => {
 export const reloadNginxConfig = async (): Promise<boolean> => {
   try {
     if (isBrowser) {
-      console.log("Running in browser, would reload Nginx configuration");
-      return true;
+      if (import.meta.env.DEV) {
+        console.log("Running in dev mode, would reload Nginx configuration");
+        return true;
+      } else {
+        // In production, call the API
+        const response = await fetch(`${API_BASE_URL}/nginx/reload`, {
+          method: 'POST',
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        
+        return true;
+      }
     }
 
-    await execPromise('sudo systemctl reload nginx');
+    // This code will never run in the browser
     return true;
   } catch (error) {
     console.error("Failed to reload Nginx:", error);

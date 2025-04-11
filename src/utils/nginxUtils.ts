@@ -1,17 +1,11 @@
 
 import { WhitelistGroup } from "@/types/proxy";
 import { toast } from "sonner";
-import { exec } from 'child_process';
-import * as fs from 'fs';
-import * as util from 'util';
 
-// Convert Node.js callback-based functions to Promise-based
-const execPromise = util.promisify(exec);
-const writeFilePromise = util.promisify(fs.writeFile);
-const readFilePromise = util.promisify(fs.readFile);
-const accessPromise = util.promisify(fs.access);
+// Base API URL for server operations
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-// Path to the Nginx configuration file on the local server
+// Path to the Nginx configuration file on the server
 const NGINX_CONFIG_PATH = "/etc/nginx/nginx.conf";
 
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
@@ -58,22 +52,28 @@ ${destinationsMap}
 
 export const validateNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
   try {
-    // Write the configuration to a temporary file
-    const tempConfigPath = '/tmp/nginx-test.conf';
-    await writeFilePromise(tempConfigPath, config);
+    if (import.meta.env.DEV) {
+      console.log("Running in dev mode, simulating Nginx config validation");
+      toast.success("Nginx configuration validated successfully (Development mode)");
+      return true;
+    }
     
-    // Test the configuration using nginx -t
-    const { stdout, stderr } = await execPromise(`sudo nginx -t -c ${tempConfigPath}`);
+    // In production, validate via the API
+    const response = await fetch(`${API_BASE_URL}/nginx/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ config }),
+    });
     
-    // Clean up the temporary file
-    await execPromise(`rm ${tempConfigPath}`);
+    const result = await response.json();
     
-    // Check if the test was successful
-    if (stderr.includes('syntax is ok') && stderr.includes('test is successful')) {
+    if (response.ok && result.valid) {
       toast.success("Nginx configuration validated successfully");
       return true;
     } else {
-      toast.error(`Failed to validate Nginx configuration: ${stderr}`);
+      toast.error(`Failed to validate Nginx configuration: ${result.message || 'Unknown error'}`);
       return false;
     }
   } catch (error) {
@@ -92,11 +92,29 @@ export const saveNginxConfig = async (configPath: string, config: string): Promi
       return false;
     }
     
-    // Write the configuration to the specified path
-    await writeFilePromise(configPath, config);
+    if (import.meta.env.DEV) {
+      console.log("Running in dev mode, simulating Nginx config save");
+      toast.success("Nginx configuration saved successfully (Development mode)");
+      return true;
+    }
     
-    toast.success("Nginx configuration saved successfully");
-    return true;
+    // In production, save via the API
+    const response = await fetch(`${API_BASE_URL}/nginx/save`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ config, path: configPath }),
+    });
+    
+    if (response.ok) {
+      toast.success("Nginx configuration saved successfully");
+      return true;
+    } else {
+      const result = await response.json();
+      toast.error(`Failed to save Nginx configuration: ${result.message || 'Unknown error'}`);
+      return false;
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     toast.error(`Failed to save Nginx configuration: ${errorMessage}`);
@@ -107,15 +125,25 @@ export const saveNginxConfig = async (configPath: string, config: string): Promi
 
 export const reloadNginxConfig = async (): Promise<boolean> => {
   try {
-    // Use sudo to reload nginx
-    const { stdout, stderr } = await execPromise('sudo systemctl reload nginx');
-    
-    if (stderr) {
-      throw new Error(stderr);
+    if (import.meta.env.DEV) {
+      console.log("Running in dev mode, simulating Nginx reload");
+      toast.success("Nginx configuration reloaded successfully (Development mode)");
+      return true;
     }
     
-    toast.success("Nginx configuration reloaded successfully");
-    return true;
+    // In production, reload via the API
+    const response = await fetch(`${API_BASE_URL}/nginx/reload`, {
+      method: 'POST',
+    });
+    
+    if (response.ok) {
+      toast.success("Nginx configuration reloaded successfully");
+      return true;
+    } else {
+      const result = await response.json();
+      toast.error(`Failed to reload Nginx configuration: ${result.message || 'Unknown error'}`);
+      return false;
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     toast.error(`Failed to reload Nginx configuration: ${errorMessage}`);
@@ -126,9 +154,15 @@ export const reloadNginxConfig = async (): Promise<boolean> => {
 
 export const testConfigWritable = async (configPath: string): Promise<boolean> => {
   try {
-    // Check if the file exists and is writable
-    await accessPromise(configPath, fs.constants.F_OK | fs.constants.W_OK);
-    return true;
+    if (import.meta.env.DEV) {
+      console.log("Running in dev mode, simulating config writability check");
+      return true;
+    }
+    
+    // In production, check via the API
+    const response = await fetch(`${API_BASE_URL}/nginx/writable?path=${encodeURIComponent(configPath)}`);
+    const result = await response.json();
+    return result.writable || false;
   } catch (error) {
     console.error("File access error:", error);
     return false;
