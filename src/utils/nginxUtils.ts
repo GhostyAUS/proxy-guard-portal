@@ -5,7 +5,7 @@ import { toast } from "sonner";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Path to the Nginx configuration file on the server
-const NGINX_CONFIG_PATH = "/etc/nginx/nginx.conf";
+export const NGINX_CONFIG_PATH = "/etc/nginx/nginx.conf";
 
 // Path to the command execution script
 const COMMAND_SCRIPT_PATH = "/usr/local/bin/proxyguard-exec";
