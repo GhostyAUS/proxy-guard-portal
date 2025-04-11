@@ -1,28 +1,36 @@
 
 import { WhitelistGroup, ProxySettings, NginxStatus } from "@/types/proxy";
-import fs from 'fs';
-import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { v4 as uuidv4 } from 'uuid';
 
 // Configuration
-const WHITELIST_CONFIG_PATH = process.env.WHITELIST_CONFIG_PATH || '/etc/proxyguard/whitelist.json';
-const PROXY_SETTINGS_PATH = process.env.PROXY_SETTINGS_PATH || '/etc/proxyguard/settings.json';
-const NGINX_CONFIG_PATH = process.env.NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
-
-const execAsync = promisify(exec);
+const WHITELIST_CONFIG_PATH = import.meta.env.VITE_WHITELIST_CONFIG_PATH || '/etc/proxyguard/whitelist.json';
+const PROXY_SETTINGS_PATH = import.meta.env.VITE_PROXY_SETTINGS_PATH || '/etc/proxyguard/settings.json';
+const NGINX_CONFIG_PATH = import.meta.env.VITE_NGINX_CONFIG_PATH || '/etc/nginx/nginx.conf';
 
 // Function to read whitelist groups from configuration file
 export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
   try {
-    // Check if whitelist config exists
-    if (!fs.existsSync(WHITELIST_CONFIG_PATH)) {
-      console.error(`Whitelist config not found: ${WHITELIST_CONFIG_PATH}`);
-      return [];
-    }
-
-    const whitelistData = fs.readFileSync(WHITELIST_CONFIG_PATH, 'utf8');
-    return JSON.parse(whitelistData) as WhitelistGroup[];
+    console.log("Would attempt to read whitelist from:", WHITELIST_CONFIG_PATH);
+    
+    // Return mock data in browser environment
+    return [
+      {
+        id: "1",
+        name: "Default Allow Group",
+        description: "Allow traffic to common services",
+        enabled: true,
+        clients: ["192.168.1.0/24", "10.0.0.1"],
+        destinations: ["example.com", "api.example.org"]
+      },
+      {
+        id: "2",
+        name: "Admin Access",
+        description: "Special access for administrators",
+        enabled: false,
+        clients: ["10.0.0.5", "10.0.0.6"],
+        destinations: ["admin.example.com"]
+      }
+    ];
   } catch (error) {
     console.error("Failed to read whitelist groups:", error);
     return [];
@@ -32,14 +40,8 @@ export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
 // Function to write whitelist groups to configuration file
 export const writeWhitelistGroups = async (groups: WhitelistGroup[]): Promise<boolean> => {
   try {
-    const configDir = path.dirname(WHITELIST_CONFIG_PATH);
-    
-    // Create config directory if it doesn't exist
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-    
-    fs.writeFileSync(WHITELIST_CONFIG_PATH, JSON.stringify(groups, null, 2));
+    console.log("Would write whitelist groups to:", WHITELIST_CONFIG_PATH, groups);
+    // In a browser environment, this would call an API
     return true;
   } catch (error) {
     console.error('Failed to write whitelist groups:', error);
@@ -50,21 +52,15 @@ export const writeWhitelistGroups = async (groups: WhitelistGroup[]): Promise<bo
 // Function to read proxy settings from configuration file
 export const readProxySettings = async (): Promise<ProxySettings> => {
   try {
-    // Check if settings file exists
-    if (!fs.existsSync(PROXY_SETTINGS_PATH)) {
-      console.error(`Proxy settings not found: ${PROXY_SETTINGS_PATH}`);
-      
-      // Return default settings
-      return {
-        nginxConfigPath: NGINX_CONFIG_PATH,
-        isReadOnly: false,
-        proxyPort: "8080",
-        authType: "none"
-      };
-    }
-
-    const settingsData = fs.readFileSync(PROXY_SETTINGS_PATH, 'utf8');
-    return JSON.parse(settingsData) as ProxySettings;
+    console.log("Would attempt to read proxy settings from:", PROXY_SETTINGS_PATH);
+    
+    // Return default settings in browser environment
+    return {
+      nginxConfigPath: NGINX_CONFIG_PATH,
+      isReadOnly: false,
+      proxyPort: "8080",
+      authType: "none"
+    };
   } catch (error) {
     console.error("Failed to read proxy settings:", error);
     
@@ -81,14 +77,8 @@ export const readProxySettings = async (): Promise<ProxySettings> => {
 // Function to write proxy settings to configuration file
 export const writeProxySettings = async (settings: ProxySettings): Promise<boolean> => {
   try {
-    const configDir = path.dirname(PROXY_SETTINGS_PATH);
-    
-    // Create config directory if it doesn't exist
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-    
-    fs.writeFileSync(PROXY_SETTINGS_PATH, JSON.stringify(settings, null, 2));
+    console.log("Would write proxy settings to:", PROXY_SETTINGS_PATH, settings);
+    // In a browser environment, this would call an API
     return true;
   } catch (error) {
     console.error('Failed to write proxy settings:', error);
@@ -99,37 +89,17 @@ export const writeProxySettings = async (settings: ProxySettings): Promise<boole
 // Function to check Nginx status
 export const checkNginxStatus = async (): Promise<NginxStatus> => {
   try {
-    // Check if Nginx is running
-    const { stdout: statusOutput } = await execAsync('systemctl is-active nginx');
-    const isRunning = statusOutput.trim() === 'active';
-    
-    // Check if Nginx config is valid
-    let configTestSuccess = false;
-    let configTestMessage = '';
-    
-    try {
-      await execAsync('nginx -t');
-      configTestSuccess = true;
-      configTestMessage = 'Configuration test successful';
-    } catch (error: any) {
-      configTestSuccess = false;
-      configTestMessage = error.stderr || 'Configuration test failed';
-    }
-    
-    // Check if Nginx config is writable
-    const configWritable = fs.accessSync(NGINX_CONFIG_PATH, fs.constants.W_OK) === undefined;
-    
-    // Get last modified time of the config file
-    const stats = fs.statSync(NGINX_CONFIG_PATH);
+    // Mock Nginx status in browser environment
+    console.log("Would check Nginx status");
     
     return {
-      isRunning,
+      isRunning: true,
       lastConfigTest: {
-        success: configTestSuccess,
-        message: configTestMessage
+        success: true,
+        message: 'Configuration test successful'
       },
-      lastModified: stats.mtime.toISOString(),
-      configWritable
+      lastModified: new Date().toISOString(),
+      configWritable: true
     };
   } catch (error) {
     console.error("Failed to check Nginx status:", error);
@@ -149,7 +119,8 @@ export const checkNginxStatus = async (): Promise<NginxStatus> => {
 // Function to reload Nginx configuration
 export const reloadNginxConfig = async (): Promise<boolean> => {
   try {
-    await execAsync('systemctl reload nginx');
+    console.log("Would reload Nginx configuration");
+    // Mock successful reload in browser environment
     return true;
   } catch (error) {
     console.error("Failed to reload Nginx:", error);

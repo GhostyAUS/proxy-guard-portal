@@ -1,56 +1,46 @@
 
 import { LogEntry, LogStats } from "@/types/logs";
-import fs from 'fs';
-import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 // Configuration
-const LOG_FILE_PATH = process.env.LOG_FILE_PATH || '/var/log/proxyguard/access.log';
-const LOG_STATS_PATH = process.env.LOG_STATS_PATH || '/var/log/proxyguard/stats.json';
+const LOG_FILE_PATH = import.meta.env.VITE_LOG_FILE_PATH || '/var/log/proxyguard/access.log';
+const LOG_STATS_PATH = import.meta.env.VITE_LOG_STATS_PATH || '/var/log/proxyguard/stats.json';
 
 // Function to read logs from the filesystem
 export const readLogsFromFile = async (): Promise<LogEntry[]> => {
   try {
-    // Check if log file exists
-    if (!fs.existsSync(LOG_FILE_PATH)) {
-      console.error(`Log file not found: ${LOG_FILE_PATH}`);
-      
-      // Generate a sample log entry to show the functionality
-      const sampleLog: LogEntry = {
+    // Since we're running in a browser environment, we can't access the filesystem directly
+    // In a real environment, this would be an API call to a backend service
+    console.log("Would attempt to read logs from:", LOG_FILE_PATH);
+    
+    // Create mock data to demonstrate functionality
+    const mockLogs: LogEntry[] = [
+      {
         id: uuidv4(),
         timestamp: new Date().toISOString(),
-        clientIp: '127.0.0.1',
+        clientIp: '192.168.1.1',
         destination: 'example.com',
         status: 'allowed',
         method: 'GET',
-        userAgent: 'Sample/1.0',
-        reason: 'This is a sample log entry since the log file is not available',
-      };
-      
-      // Throw error to be caught by caller
-      throw new Error(`Log file not found: ${LOG_FILE_PATH}`);
-    }
-
-    const logData = fs.readFileSync(LOG_FILE_PATH, 'utf8');
-    const logLines = logData.trim().split('\n');
-    
-    // Process each line as a log entry
-    const logs: LogEntry[] = logLines.map((line, index) => {
-      try {
-        return JSON.parse(line) as LogEntry;
-      } catch (error) {
-        console.error(`Error parsing log entry at line ${index}:`, error);
-        return null;
+        userAgent: 'Mozilla/5.0',
+        reason: 'Mock data - filesystem access not available in browser',
+      },
+      {
+        id: uuidv4(),
+        timestamp: new Date(Date.now() - 300000).toISOString(),
+        clientIp: '192.168.1.2',
+        destination: 'api.example.org',
+        status: 'denied',
+        method: 'POST',
+        userAgent: 'Chrome/96.0',
+        reason: 'Mock data - filesystem access not available in browser',
       }
-    }).filter(Boolean) as LogEntry[];
+    ];
     
-    // Sort logs by timestamp (newest first)
-    return logs.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
+    return mockLogs;
   } catch (error) {
     console.error("Failed to read logs from file:", error);
-    return [];
+    throw new Error("Log file access unavailable");
   }
 };
 
@@ -106,15 +96,8 @@ function countTopDestinations(items: string[], limit: number) {
 // Function to write a log entry to the log file
 export const writeLogEntry = async (logEntry: LogEntry): Promise<boolean> => {
   try {
-    const logDir = path.dirname(LOG_FILE_PATH);
-    
-    // Create log directory if it doesn't exist
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true });
-    }
-    
-    // Append the log entry to the log file
-    fs.appendFileSync(LOG_FILE_PATH, JSON.stringify(logEntry) + '\n');
+    console.log("Would write log entry to:", LOG_FILE_PATH, logEntry);
+    // In a browser environment, this would call an API
     return true;
   } catch (error) {
     console.error('Failed to write log entry:', error);
@@ -125,32 +108,11 @@ export const writeLogEntry = async (logEntry: LogEntry): Promise<boolean> => {
 // Function to get cached stats or calculate new ones
 export const getLogStats = async (): Promise<LogStats> => {
   try {
-    // Try to read cached stats first
-    if (fs.existsSync(LOG_STATS_PATH)) {
-      const statsData = fs.readFileSync(LOG_STATS_PATH, 'utf8');
-      const stats = JSON.parse(statsData) as LogStats;
-      
-      // Check if stats were updated in the last 15 minutes
-      const lastUpdated = new Date(stats.lastUpdated);
-      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-      
-      if (lastUpdated > fifteenMinutesAgo) {
-        return stats;
-      }
-    }
+    console.log("Would attempt to get stats from:", LOG_STATS_PATH);
     
-    // Calculate new stats if cached stats are outdated or don't exist
+    // Generate mock stats
     const logs = await readLogsFromFile();
     const newStats = calculateLogStats(logs);
-    
-    // Create stats directory if it doesn't exist
-    const statsDir = path.dirname(LOG_STATS_PATH);
-    if (!fs.existsSync(statsDir)) {
-      fs.mkdirSync(statsDir, { recursive: true });
-    }
-    
-    // Cache the new stats
-    fs.writeFileSync(LOG_STATS_PATH, JSON.stringify(newStats));
     
     return newStats;
   } catch (error) {
