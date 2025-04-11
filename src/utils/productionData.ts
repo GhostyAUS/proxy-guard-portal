@@ -1,5 +1,5 @@
 
-import { WhitelistGroup, ProxySettings, NginxStatus } from "@/types/proxy";
+import { WhitelistGroup, ProxySettings, NginxStatus, ClientIP, Destination } from "@/types/proxy";
 import { v4 as uuidv4 } from 'uuid';
 
 // Configuration
@@ -19,16 +19,27 @@ export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
         name: "Default Allow Group",
         description: "Allow traffic to common services",
         enabled: true,
-        clients: ["192.168.1.0/24", "10.0.0.1"],
-        destinations: ["example.com", "api.example.org"]
+        clients: [
+          { id: "c1", value: "192.168.1.0/24", description: "Local network" },
+          { id: "c2", value: "10.0.0.1", description: "Gateway" }
+        ],
+        destinations: [
+          { id: "d1", value: "example.com", description: "Example website" },
+          { id: "d2", value: "api.example.org", description: "API endpoint" }
+        ]
       },
       {
         id: "2",
         name: "Admin Access",
         description: "Special access for administrators",
         enabled: false,
-        clients: ["10.0.0.5", "10.0.0.6"],
-        destinations: ["admin.example.com"]
+        clients: [
+          { id: "c3", value: "10.0.0.5", description: "Admin PC 1" },
+          { id: "c4", value: "10.0.0.6", description: "Admin PC 2" }
+        ],
+        destinations: [
+          { id: "d3", value: "admin.example.com", description: "Admin portal" }
+        ]
       }
     ];
   } catch (error) {
