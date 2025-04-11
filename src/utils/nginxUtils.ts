@@ -1,4 +1,3 @@
-
 import { WhitelistGroup } from "@/types/proxy";
 import { toast } from "sonner";
 
@@ -40,12 +39,27 @@ ${destinationsMap}
   
   // Generate the access condition for the server block
   const accessConditions = groups.filter(g => g.enabled).map(group => 
-    `if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
-  ).join('\n    ');
+    `    if ($client_${group.id} = 1 && $dest_${group.id} = 1) { set $allow_access 1; }`
+  ).join('\n');
+  
+  // Add a default rule if no groups are enabled (to avoid empty if conditions)
+  const finalMapBlocks = mapBlocks || `
+# Default group (no enabled groups)
+map $remote_addr $client_default {
+    default 1; # Allow by default when no groups are defined
+}
+
+map $http_host $dest_default {
+    default 1; # Allow by default when no groups are defined
+}
+`;
+
+  const finalAccessConditions = accessConditions || 
+    `    if ($client_default = 1 && $dest_default = 1) { set $allow_access 1; }`;
   
   // Replace placeholders in the template
-  config = config.replace('# PLACEHOLDER:MAP_BLOCKS', mapBlocks);
-  config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', accessConditions);
+  config = config.replace('# PLACEHOLDER:MAP_BLOCKS', finalMapBlocks);
+  config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', finalAccessConditions);
   
   return config;
 };
