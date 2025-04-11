@@ -30,6 +30,19 @@ http {
         127.0.0.1 default_group;       # Localhost
     }
     
+    # Map for allowed domains
+    map $host $is_allowed_domain {
+        default 0;
+        "example.com" 1;
+        "~^.*\.google\.com$" 1;
+    }
+    
+    # Map for checking permissions
+    map $client_group:$is_allowed_domain $allowed {
+        default 0;
+        "default_group:1" 1;
+    }
+    
     server {
         listen 8080;
         resolver 8.8.8.8 ipv6=off;
@@ -46,28 +59,7 @@ http {
         add_header X-Robots-Tag none;
         
         location / {
-            # Access rules for default group
-            set $allow_default_group 0;
-            
-            # Check if client belongs to default group
-            if ($client_group = "default_group") {
-                # Example.com domain
-                if ($host = "example.com") {
-                    set $allow_default_group 1;
-                }
-                # Google wildcard domain
-                if ($host ~ .*\.google\.com$) {
-                    set $allow_default_group 1;
-                }
-            }
-            
-            # Evaluate access permissions
-            set $allowed 0;
-            if ($allow_default_group = 1) {
-                set $allowed 1;
-            }
-            
-            # Deny access if not allowed
+            # Check if client is allowed
             if ($allowed = 0) {
                 return 403 "Access denied: Either your IP is not whitelisted or you're not authorized to access this URL.";
             }
@@ -80,9 +72,8 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_connect_timeout 10s;
-            proxy_send_timeout 60s;
             proxy_read_timeout 60s;
+            proxy_send_timeout 60s;
         }
     }
 }

@@ -17,13 +17,9 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
   // Filter enabled groups
   const enabledGroups = groups.filter(g => g.enabled);
   
-  // Generate geo blocks for IP addresses
-  let geoBlocks = '';
-  let serverLocations = '';
-  
   if (enabledGroups.length > 0) {
     // Generate the geo blocks for client IPs
-    geoBlocks = `
+    let geoBlocks = `
 # CLIENT GROUP DEFINITIONS
 geo $remote_addr $client_group {
     default "";
@@ -35,51 +31,61 @@ ${enabledGroups.map((group) => {
 }).join('\n')}
 }`;
 
-    // Generate detection variables and conditions for hostname matching
-    let accessConditions = '';
-    
-    enabledGroups.forEach(group => {
+    // Generate map blocks for hostname matching
+    let hostMaps = '';
+    enabledGroups.forEach((group) => {
       const safeGroupId = group.id.replace(/[^a-zA-Z0-9]/g, '_');
-      accessConditions += `
-    # Access rules for group ${group.name} (${safeGroupId})
-    set $allow_${safeGroupId} 0;
-    
-    # Check if client belongs to group ${safeGroupId}
-    if ($client_group = "${safeGroupId}") {
-        ${group.destinations.map(dest => {
-          if (dest.value.includes('*')) {
-            // Handle wildcard domains with regex - fixed syntax
-            const pattern = dest.value.replace(/\*/g, '').replace(/\./g, '\\.');
-            return `# ${dest.description || 'Wildcard domain'}
-        if ($host ~ .*${pattern}$) {
-            set $allow_${safeGroupId} 1;
-        }`;
-          } else {
-            // Handle exact match domains
-            return `# ${dest.description || 'Exact domain'}
-        if ($host = "${dest.value}") {
-            set $allow_${safeGroupId} 1;
-        }`;
-          }
-        }).join('\n        ')}
-    }`;
+      
+      // Create map entries for domains in this group
+      hostMaps += `
+# Host map for ${group.name} (${safeGroupId})
+map $host $is_${safeGroupId}_domain {
+    default 0;
+${group.destinations.map(dest => {
+  if (dest.value.includes('*')) {
+    // Handle wildcard domains with regex
+    const pattern = dest.value.replace(/\*/g, '.*');
+    return `    "~^${pattern}$" 1;  # ${dest.description || 'Wildcard domain'}`;
+  } else {
+    return `    "${dest.value}" 1;  # ${dest.description || 'Exact domain'}`;
+  }
+}).join('\n')}
+}
+
+# Permission map for ${group.name} (${safeGroupId})
+map $client_group:$is_${safeGroupId}_domain $allow_${safeGroupId} {
+    default 0;
+    "${safeGroupId}:1" 1;
+}`;
     });
 
-    // Combined access evaluation
-    let accessEvaluation = `
-    # Evaluate access permissions
-    set $allowed 0;
-${enabledGroups.map(group => {
-  const safeGroupId = group.id.replace(/[^a-zA-Z0-9]/g, '_');
-  return `    if ($allow_${safeGroupId} = 1) {
-        set $allowed 1;
-    }`;
-}).join('\n')}
-    
-    # Deny access if not allowed
-    if ($allowed = 0) {
-        return 403 "Access denied: Either your IP is not whitelisted or you're not authorized to access this URL.";
-    }`;
+    // Combined access map
+    let accessMap = `
+# Combined access evaluation
+map $allow_${enabledGroups.map(g => g.id.replace(/[^a-zA-Z0-9]/g, '_')).join('_or_$allow_')} $allowed {
+    default 0;
+    "~^1" 1;
+}`;
+
+    // Location block
+    const locationBlock = `
+        location / {
+            # Check if client is allowed
+            if ($allowed = 0) {
+                return 403 "Access denied: Either your IP is not whitelisted or you're not authorized to access this URL.";
+            }
+            
+            # HTTP forwarding settings
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header Connection "";
+            proxy_pass $scheme://$host$request_uri;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 60s;
+            proxy_send_timeout 60s;
+        }`;
 
     // Logging format blocks
     const loggingFormat = `
@@ -98,33 +104,22 @@ ${enabledGroups.map(group => {
     access_log /var/log/nginx/access.log main;
     error_log /var/log/nginx/error.log info;
     access_log /var/log/nginx/denied.log denied;`;
-
-    // Proxy settings
-    const proxySettings = `
-    # HTTP forwarding settings
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header Connection "";
-    proxy_pass $scheme://$host$request_uri;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_connect_timeout 10s;
-    proxy_send_timeout 60s;
-    proxy_read_timeout 60s;`;
-
-    serverLocations = accessConditions + accessEvaluation + proxySettings;
     
     // Replace placeholders in the template
-    config = config.replace('# PLACEHOLDER:MAP_BLOCKS', geoBlocks);
+    config = config.replace('# PLACEHOLDER:MAP_BLOCKS', geoBlocks + hostMaps + accessMap);
     config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', loggingFormat);
-    config = config.replace('# PLACEHOLDER:SERVER_LOCATIONS', serverLocations);
+    config = config.replace('# PLACEHOLDER:SERVER_LOCATIONS', locationBlock);
   } else {
     // Default config when no groups are defined
-    geoBlocks = `
+    const geoBlocks = `
 # No whitelist groups defined - default configuration
 geo $remote_addr $client_group {
     default "default";  # Allow all by default when no groups are defined
+}
+
+# Default allow map
+map $client_group $allowed {
+    default 1;  # Allow all by default
 }`;
 
     const loggingFormat = `
@@ -144,26 +139,27 @@ geo $remote_addr $client_group {
     error_log /var/log/nginx/error.log info;
     access_log /var/log/nginx/denied.log denied;`;
     
-    serverLocations = `
-    # Default access rule (no groups enabled)
-    set $allowed 1;  # Allow all by default when no restrictions are defined
-    
-    # HTTP forwarding settings
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header Connection "";
-    proxy_pass $scheme://$host$request_uri;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_connect_timeout 10s;
-    proxy_send_timeout 60s;
-    proxy_read_timeout 60s;`;
+    const locationBlock = `
+        location / {
+            # Default access rule (no groups enabled)
+            # All traffic allowed when no restrictions defined
+            
+            # HTTP forwarding settings
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header Connection "";
+            proxy_pass $scheme://$host$request_uri;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 60s;
+            proxy_send_timeout 60s;
+        }`;
     
     // Replace placeholders in the template
     config = config.replace('# PLACEHOLDER:MAP_BLOCKS', geoBlocks);
     config = config.replace('# PLACEHOLDER:ACCESS_CONDITIONS', loggingFormat);
-    config = config.replace('# PLACEHOLDER:SERVER_LOCATIONS', serverLocations);
+    config = config.replace('# PLACEHOLDER:SERVER_LOCATIONS', locationBlock);
   }
   
   return config;
@@ -368,7 +364,7 @@ http {
     
     server {
         listen 8080;
-        resolver 8.8.8.8 1.1.1.1 ipv6=off;
+        resolver 8.8.8.8 ipv6=off;
         
         # Security headers
         proxy_hide_header Upgrade;
@@ -381,9 +377,7 @@ http {
         add_header Referrer-Policy no-referrer always;
         add_header X-Robots-Tag none;
         
-        location / {
 # PLACEHOLDER:SERVER_LOCATIONS
-        }
     }
 }
 `;
