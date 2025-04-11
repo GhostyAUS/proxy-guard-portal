@@ -1,6 +1,15 @@
 
 import { WhitelistGroup } from "@/types/proxy";
 import { toast } from "sonner";
+import { exec } from 'child_process';
+import * as fs from 'fs';
+import * as util from 'util';
+
+// Convert Node.js callback-based functions to Promise-based
+const execPromise = util.promisify(exec);
+const writeFilePromise = util.promisify(fs.writeFile);
+const readFilePromise = util.promisify(fs.readFile);
+const accessPromise = util.promisify(fs.access);
 
 // Path to the Nginx configuration file on the local server
 const NGINX_CONFIG_PATH = "/etc/nginx/nginx.conf";
@@ -49,57 +58,79 @@ ${destinationsMap}
 
 export const validateNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
   try {
-    // In a real implementation, this would use a local API or run a command like:
-    // sudo nginx -t -c /tmp/nginx-test.conf
+    // Write the configuration to a temporary file
+    const tempConfigPath = '/tmp/nginx-test.conf';
+    await writeFilePromise(tempConfigPath, config);
     
-    // For now, we'll simulate a successful validation
-    toast.success("Nginx configuration validated successfully");
-    return true;
+    // Test the configuration using nginx -t
+    const { stdout, stderr } = await execPromise(`sudo nginx -t -c ${tempConfigPath}`);
+    
+    // Clean up the temporary file
+    await execPromise(`rm ${tempConfigPath}`);
+    
+    // Check if the test was successful
+    if (stderr.includes('syntax is ok') && stderr.includes('test is successful')) {
+      toast.success("Nginx configuration validated successfully");
+      return true;
+    } else {
+      toast.error(`Failed to validate Nginx configuration: ${stderr}`);
+      return false;
+    }
   } catch (error) {
-    toast.error(`Failed to validate Nginx configuration: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    toast.error(`Failed to validate Nginx configuration: ${errorMessage}`);
+    console.error("Validation error:", error);
     return false;
   }
 };
 
 export const saveNginxConfig = async (configPath: string, config: string): Promise<boolean> => {
   try {
-    // In a real implementation, this would use a local API or run a command like:
-    // echo "${config}" | sudo tee ${configPath}
+    // First validate the configuration
+    const isValid = await validateNginxConfig(configPath, config);
+    if (!isValid) {
+      return false;
+    }
     
-    console.log("Saving nginx config to", configPath);
-    console.log(config);
+    // Write the configuration to the specified path
+    await writeFilePromise(configPath, config);
     
-    // Simulate success
     toast.success("Nginx configuration saved successfully");
     return true;
   } catch (error) {
-    toast.error(`Failed to save Nginx configuration: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    toast.error(`Failed to save Nginx configuration: ${errorMessage}`);
+    console.error("Save error:", error);
     return false;
   }
 };
 
 export const reloadNginxConfig = async (): Promise<boolean> => {
   try {
-    // In a real implementation, this would use a local API or run a command like:
-    // sudo systemctl reload nginx
+    // Use sudo to reload nginx
+    const { stdout, stderr } = await execPromise('sudo systemctl reload nginx');
     
-    // Simulate success
+    if (stderr) {
+      throw new Error(stderr);
+    }
+    
     toast.success("Nginx configuration reloaded successfully");
     return true;
   } catch (error) {
-    toast.error(`Failed to reload Nginx configuration: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    toast.error(`Failed to reload Nginx configuration: ${errorMessage}`);
+    console.error("Reload error:", error);
     return false;
   }
 };
 
 export const testConfigWritable = async (configPath: string): Promise<boolean> => {
   try {
-    // In a real implementation, this would check if the config file is writable
-    // For example by testing write permissions or trying a small write operation
-    
-    // Simulate success
+    // Check if the file exists and is writable
+    await accessPromise(configPath, fs.constants.F_OK | fs.constants.W_OK);
     return true;
   } catch (error) {
+    console.error("File access error:", error);
     return false;
   }
 };

@@ -11,8 +11,10 @@ echo "Installing Nginx and required packages..."
 sudo apt-get update
 sudo apt-get install -y nginx openssl
 
-# Create directory for SSL certificates
+# Create directory for SSL certificates and ProxyGuard configs
 sudo mkdir -p /etc/nginx/certs
+sudo mkdir -p /etc/proxyguard
+sudo chmod 755 /etc/proxyguard
 
 # Generate self-signed SSL certificates (for development)
 echo "Generating self-signed SSL certificates..."
@@ -29,9 +31,37 @@ sudo cp nginx.conf.template /etc/nginx/nginx.conf
 # Create .htpasswd file for basic auth (if needed)
 sudo touch /etc/nginx/.htpasswd
 
-# Set permissions
+# Create configuration files for ProxyGuard
+echo "Setting up ProxyGuard configuration files..."
+echo '[]' | sudo tee /etc/proxyguard/whitelist.json > /dev/null
+echo '{"nginxConfigPath":"/etc/nginx/nginx.conf","isReadOnly":false,"proxyPort":"8080","authType":"none"}' | sudo tee /etc/proxyguard/settings.json > /dev/null
+
+# Set proper permissions for files
 sudo chmod 644 /etc/nginx/nginx.conf
 sudo chmod 600 /etc/nginx/certs/server.key
+sudo chmod 644 /etc/nginx/certs/server.crt
+sudo chmod 644 /etc/proxyguard/whitelist.json
+sudo chmod 644 /etc/proxyguard/settings.json
+
+# Create a proxyguard group and add the current user to it
+echo "Setting up user permissions..."
+sudo groupadd -f proxyguard
+sudo usermod -aG proxyguard $USER
+sudo usermod -aG proxyguard www-data
+
+# Set group ownership for configuration files
+sudo chown :proxyguard /etc/nginx/nginx.conf
+sudo chown :proxyguard /etc/proxyguard/whitelist.json
+sudo chown :proxyguard /etc/proxyguard/settings.json
+
+# Make config files group-writable
+sudo chmod g+w /etc/nginx/nginx.conf
+sudo chmod g+w /etc/proxyguard/whitelist.json
+sudo chmod g+w /etc/proxyguard/settings.json
+
+# Setup sudoers entry to allow nginx restart without password
+echo "Setting up sudoers for nginx service management..."
+echo "%proxyguard ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx, /bin/systemctl reload nginx, /bin/systemctl status nginx" | sudo EDITOR='tee -a' visudo
 
 # Restart Nginx
 echo "Restarting Nginx service..."
