@@ -1,3 +1,4 @@
+
 #!/usr/bin/env node
 
 /**
@@ -7,14 +8,19 @@
  * and executes appropriate system commands using the proxyguard-exec script.
  */
 
-const express = require('express');
-const fs = require('fs').promises;
-const { spawn } = require('child_process');
-const bodyParser = require('body-parser');
-const path = require('path');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const morgan = require('morgan');
+import express from 'express';
+import { promises as fs } from 'fs';
+import { spawn } from 'child_process';
+import bodyParser from 'body-parser';
+import path from 'path';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import morgan from 'morgan';
+import { fileURLToPath } from 'url';
+
+// Get current directory path (ES module equivalent of __dirname)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configuration
 const PORT = process.env.PORT || 3001;
@@ -28,7 +34,7 @@ const LOG_FILE_PATH = '/var/log/proxyguard/access.log';
 // Try to read API key from file
 let apiKey = '';
 try {
-  apiKey = fs.readFileSync(API_KEY_PATH, 'utf8').trim();
+  apiKey = await fs.readFile(API_KEY_PATH, 'utf8').then(data => data.trim());
 } catch (err) {
   console.warn(`Warning: Could not read API key from ${API_KEY_PATH}. API endpoints will not be protected.`);
   console.warn('Run generate-api-key.sh to create an API key for security.');

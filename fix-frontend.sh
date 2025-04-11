@@ -19,9 +19,14 @@ cat > /opt/proxyguard/start-frontend.js << 'EOL'
  * This script starts a simple server to host the frontend application
  */
 
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// Get current directory path (ES module equivalent of __dirname)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3000;
 const STATIC_FILES_PATH = path.join(__dirname, 'dist');
@@ -60,4 +65,3 @@ systemctl restart proxyguard-frontend.service
 
 echo "Done! The ProxyGuard frontend service should now be running."
 echo "You can check its status with: systemctl status proxyguard-frontend.service"
-
