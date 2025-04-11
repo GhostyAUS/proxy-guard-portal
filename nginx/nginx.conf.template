@@ -7,67 +7,89 @@ events {
 }
 
 http {
-    access_log /var/log/nginx/access.log;
+    # Logging formats
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                     '$status $body_bytes_sent "$http_referer" '
+                     '"$http_user_agent" "$http_x_forwarded_for"';
     
-    # Define variables for access control
-    map $remote_addr $allow_access {
-        default 0;
-    }
+    log_format denied '$remote_addr - [$time_local] "$request" '
+                      '$status "$http_user_agent" "$http_referer" '
+                      'Host: "$host" URI: "$request_uri" '
+                      'Client: "$remote_addr" '
+                      'Group: "$client_group"';
     
-    # Sample group
-    map $remote_addr $client_default {
-        default 0;
-        192.168.0.0/16 1;  # Local network
-        127.0.0.1 1;       # Localhost
-    }
+    # Log file paths
+    access_log /var/log/nginx/access.log main;
+    error_log /var/log/nginx/error.log info;
+    access_log /var/log/nginx/denied.log denied if=$status ~* ^4;
     
-    map $http_host $dest_default {
-        default 0;
-        example.com 1;     # Example site
-        *.google.com 1;    # Google domains
+    # CLIENT GROUP DEFINITIONS
+    geo $remote_addr $client_group {
+        default "";
+        192.168.1.0/24 default_group;  # Local network
+        127.0.0.1 default_group;       # Localhost
     }
     
     server {
-        listen 8080 ssl http2;
-        
-        # SSL configuration for HTTPS
-        ssl_certificate /etc/nginx/certs/server.crt;
-        ssl_certificate_key /etc/nginx/certs/server.key;
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers HIGH:!aNULL:!MD5;
-        ssl_prefer_server_ciphers on;
-        ssl_session_cache shared:SSL:10m;
-        ssl_session_timeout 10m;
-        
-        # Check if client is allowed to access the requested destination
-        if ($client_default = 1 && $dest_default = 1) { set $allow_access 1; }
-        
-        # Block access if not allowed
-        if ($allow_access != 1) {
-            return 403 "Access denied";
-        }
-        
-        # Forward proxy configuration
+        listen 8080;
         resolver 8.8.8.8 ipv6=off;
         
-        # HTTP/HTTPS proxy - handles both protocols
+        # HTTPS CONNECT method handling
+        proxy_connect;
+        proxy_connect_allow all;
+        proxy_connect_connect_timeout 10s;
+        proxy_connect_read_timeout 60s;
+        proxy_connect_send_timeout 60s;
+        
+        # Security headers
+        proxy_hide_header Upgrade;
+        proxy_hide_header X-Powered-By;
+        add_header Content-Security-Policy "upgrade-insecure-requests";
+        add_header X-Frame-Options "SAMEORIGIN";
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cache-Control "no-transform" always;
+        add_header Referrer-Policy no-referrer always;
+        add_header X-Robots-Tag none;
+        
         location / {
-            # Authentication settings - comment out if not needed
-            #auth_basic "Proxy Authentication";
-            #auth_basic_user_file /etc/nginx/.htpasswd;
+            # Access rules for default group
+            set $allow_default_group 0;
             
-            # Handle HTTP and HTTPS traffic
-            proxy_pass $scheme://$http_host$request_uri;
-            proxy_set_header Host $http_host;
+            # Check if client belongs to default group
+            if ($client_group = "default_group") {
+                # Example.com domain
+                if ($host = "example.com") {
+                    set $allow_default_group 1;
+                }
+                # Google wildcard domain
+                if ($host ~* "^.*\\.google\\.com$") {
+                    set $allow_default_group 1;
+                }
+            }
+            
+            # Evaluate access permissions
+            set $allowed 0;
+            if ($allow_default_group = 1) {
+                set $allowed 1;
+            }
+            
+            # Deny access if not allowed
+            if ($allowed = 0) {
+                return 403 "Access denied: Either your IP is not whitelisted or you're not authorized to access this URL.";
+            }
+            
+            # HTTP forwarding settings
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header Connection "";
+            proxy_pass $scheme://$host$request_uri;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_connect_timeout 60s;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 10s;
             proxy_send_timeout 60s;
             proxy_read_timeout 60s;
-            
-            # HTTPS CONNECT method handling
-            proxy_ssl_server_name on;
-            proxy_ssl_session_reuse on;
         }
     }
 }
