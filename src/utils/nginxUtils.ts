@@ -40,43 +40,62 @@ export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: st
         return `        ${destValue} 1;  # ${dest.description || ''}`;
       }).join('\n');
       
+      // Create safe group ID for variable names (alphanumeric only)
+      const safeGroupId = group.id.replace(/[^a-zA-Z0-9]/g, '_');
+      
       return `
     # Group ${group.id}: ${group.name}
-    map $remote_addr $group_${group.id} {
+    map $remote_addr $group_${safeGroupId} {
         default 0;
 ${clientIpsMap}
     }
     
-    map $host $is_${group.id}_url {
+    map $host $is_${safeGroupId}_url {
         default 0;
 ${destinationsMap}
     }`;
     }).join('\n\n');
     
-    // Generate the map for determining if access is allowed
-    let allowConditions = enabledGroups.map(group => 
-      `        # ${group.name} group with allowed URL\n        "1:1:${enabledGroups.length > 1 ? '~:'.repeat(enabledGroups.length - 1) : ''}" 1;`
-    ).join('\n');
+    // For complex map conditions with variable number of groups
+    // Create the combined map key
+    const mapKeyParts = [];
+    const allowConditions = [];
+    const denyReasons = [];
     
-    // Generate access determination map
-    const groupVars = enabledGroups.map(group => `$group_${group.id}:$is_${group.id}_url`).join(':');
+    enabledGroups.forEach((group, index) => {
+      const safeGroupId = group.id.replace(/[^a-zA-Z0-9]/g, '_');
+      mapKeyParts.push(`$group_${safeGroupId}:$is_${safeGroupId}_url`);
+      
+      // Create the condition patterns for this group
+      const allowPattern = Array(enabledGroups.length * 2).fill('~');
+      allowPattern[index * 2] = '1';
+      allowPattern[index * 2 + 1] = '1';
+      
+      allowConditions.push(`        # ${group.name} group with allowed URL\n        "${allowPattern.join(':')}" 1;`);
+      
+      // Create the deny reason pattern for IP not in group
+      const denyIpPattern = Array(enabledGroups.length * 2).fill('0');
+      denyReasons.push(`        "${denyIpPattern.join(':')}" "IP not in any whitelisted group";`);
+      
+      // Create the deny reason pattern for URL not allowed
+      const denyUrlPattern = Array(enabledGroups.length * 2).fill('~');
+      denyUrlPattern[index * 2] = '1';
+      denyUrlPattern[index * 2 + 1] = '0';
+      denyReasons.push(`        "${denyUrlPattern.join(':')}" "URL not allowed for ${group.name} group";`);
+    });
+    
+    const mapKey = mapKeyParts.join(':');
     
     accessConditions = `
     # Determine if access is allowed based on group membership and URL
-    map "${groupVars}" $is_access_allowed {
-${allowConditions}
+    map "${mapKey}" $is_access_allowed {
+${allowConditions.join('\n')}
         default 0;
     }
     
     # Determine denial reason for logging
-    map "${groupVars}" $deny_reason {
-        "0:${enabledGroups.map(() => '~').join(':')}" "IP not in any whitelisted group";
-${enabledGroups.map((group, idx) => {
-  const pattern = Array(enabledGroups.length * 2).fill('~');
-  pattern[idx * 2] = '1';
-  pattern[idx * 2 + 1] = '0';
-  return `        "${pattern.join(':')}" "URL not allowed for ${group.name} group";`;
-}).join('\n')}
+    map "${mapKey}" $deny_reason {
+${denyReasons.join('\n')}
         default "";
     }
     
