@@ -1,4 +1,3 @@
-
 import { WhitelistGroup } from "@/types/proxy";
 import { toast } from "sonner";
 
@@ -200,7 +199,7 @@ export const executePrivilegedCommand = async (command: string): Promise<{ succe
     const scriptCommand = `${COMMAND_SCRIPT_PATH} ${command}`;
     
     // Use the Electron API if available, otherwise fall back to fetch API
-    if (window.electron) {
+    if (typeof window !== 'undefined' && window.electron) {
       const result = await window.electron.execute(scriptCommand);
       
       if (result.exitCode === 0) {
