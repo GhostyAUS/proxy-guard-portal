@@ -30,7 +30,17 @@ const STATIC_FILES_PATH = path.join(__dirname, '../dist');
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      connectSrc: ["'self'"],
+      imgSrc: ["'self'", "data:"],
+      styleSrc: ["'self'", "'unsafe-inline'"]
+    }
+  }
+}));
 app.use(morgan('combined'));
 
 // Rate limiting
@@ -228,13 +238,13 @@ app.post('/api/nginx/save', async (req, res) => {
     const tempFilePath = '/tmp/nginx_new_config';
     await fs.writeFile(tempFilePath, config);
     
-    // Execute a script to move the file with proper permissions
-    const result = await executeCommand('/bin/mv', [tempFilePath, path]);
+    // Use the privileged command script to move the file
+    const result = await executeCommand(COMMAND_SCRIPT_PATH, ['move_file', tempFilePath, path]);
     
     if (result.success) {
       res.json({ success: true });
     } else {
-      res.status(500).json({ error: 'Failed to save Nginx configuration' });
+      res.status(500).json({ error: 'Failed to save Nginx configuration', message: result.output });
     }
   } catch (err) {
     console.error('Error saving Nginx config:', err);
@@ -258,6 +268,35 @@ app.post('/api/nginx/reload', async (req, res) => {
   } catch (err) {
     console.error('Error reloading Nginx:', err);
     res.status(500).json({ error: 'Failed to reload Nginx configuration' });
+  }
+});
+
+// Execute system command (for privileged operations)
+app.post('/api/system/execute', async (req, res) => {
+  try {
+    const { command } = req.body;
+    
+    // Security check - only allow specific commands
+    if (!command.startsWith(COMMAND_SCRIPT_PATH)) {
+      return res.status(403).json({ error: 'Unauthorized command execution attempt' });
+    }
+    
+    // Split the command into executable and arguments
+    const parts = command.split(' ');
+    const executable = parts[0];
+    const args = parts.slice(1);
+    
+    // Execute the command
+    const result = await executeCommand(executable, args);
+    
+    if (result.success) {
+      res.json({ success: true, output: result.output });
+    } else {
+      res.status(500).json({ success: false, message: result.output });
+    }
+  } catch (err) {
+    console.error('Error executing command:', err);
+    res.status(500).json({ error: 'Failed to execute command' });
   }
 });
 

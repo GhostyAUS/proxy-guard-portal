@@ -29,7 +29,7 @@ case "$COMMAND" in
     exit $?
     ;;
   "check_status")
-    sudo /bin/systemctl status nginx
+    sudo /bin/systemctl is-active nginx > /dev/null
     exit $?
     ;;
   "check_writable")
@@ -45,6 +45,41 @@ case "$COMMAND" in
       exit 0
     else
       echo "File is not writable"
+      exit 1
+    fi
+    ;;
+  "move_file")
+    # Check if source and destination are provided
+    if [ $# -lt 2 ]; then
+      echo "Error: Source and destination paths required"
+      exit 1
+    fi
+    
+    SOURCE="$1"
+    DEST="$2"
+    
+    # Validate paths to prevent abuse
+    if [[ ! "$DEST" =~ ^/etc/(nginx|proxyguard)/ ]]; then
+      echo "Error: Destination path not allowed"
+      exit 1
+    fi
+    
+    # Move the file with proper ownership and permissions
+    if [ -f "$SOURCE" ]; then
+      sudo cp "$SOURCE" "$DEST"
+      sudo chmod 644 "$DEST"
+      
+      # Set appropriate ownership
+      if [[ "$DEST" =~ ^/etc/nginx/ ]]; then
+        sudo chown root:www-data "$DEST"
+      elif [[ "$DEST" =~ ^/etc/proxyguard/ ]]; then
+        sudo chown proxyguard:proxyguard "$DEST"
+      fi
+      
+      rm -f "$SOURCE"
+      exit 0
+    else
+      echo "Error: Source file not found"
       exit 1
     fi
     ;;

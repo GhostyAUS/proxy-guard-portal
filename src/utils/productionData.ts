@@ -1,10 +1,5 @@
 
-import { WhitelistGroup, ProxySettings, NginxStatus, ClientIP, Destination } from "@/types/proxy";
-
-// Configuration paths (used server-side)
-const WHITELIST_CONFIG_PATH = '/etc/proxyguard/whitelist.json';
-const PROXY_SETTINGS_PATH = '/etc/proxyguard/settings.json';
-const NGINX_CONFIG_PATH = '/etc/nginx/nginx.conf';
+import { WhitelistGroup, ProxySettings, NginxStatus } from "@/types/proxy";
 
 // Base API URL for server operations - use a relative path to avoid CORS issues
 const API_BASE_URL = '/api';
@@ -13,10 +8,17 @@ const API_BASE_URL = '/api';
 export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
   try {
     // Call the API endpoint
-    const response = await fetch(`${API_BASE_URL}/whitelist`);
+    const response = await fetch(`${API_BASE_URL}/whitelist`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
+    
     return await response.json();
   } catch (error) {
     console.error("Failed to read whitelist groups:", error);
@@ -37,7 +39,8 @@ export const writeWhitelistGroups = async (groups: WhitelistGroup[]): Promise<bo
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
     }
     
     return true;
@@ -51,10 +54,17 @@ export const writeWhitelistGroups = async (groups: WhitelistGroup[]): Promise<bo
 export const readProxySettings = async (): Promise<ProxySettings> => {
   try {
     // Call the API endpoint
-    const response = await fetch(`${API_BASE_URL}/settings`);
+    const response = await fetch(`${API_BASE_URL}/settings`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
+    
     return await response.json();
   } catch (error) {
     console.error("Failed to read proxy settings:", error);
@@ -75,7 +85,8 @@ export const writeProxySettings = async (settings: ProxySettings): Promise<boole
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
     }
     
     return true;
@@ -89,10 +100,17 @@ export const writeProxySettings = async (settings: ProxySettings): Promise<boole
 export const checkNginxStatus = async (): Promise<NginxStatus> => {
   try {
     // Call the API endpoint
-    const response = await fetch(`${API_BASE_URL}/nginx/status`);
+    const response = await fetch(`${API_BASE_URL}/nginx/status`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
+    
     return await response.json();
   } catch (error) {
     console.error("Failed to check Nginx status:", error);
@@ -109,7 +127,8 @@ export const reloadNginxConfig = async (): Promise<boolean> => {
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
     }
     
     return true;

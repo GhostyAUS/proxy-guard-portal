@@ -1,14 +1,20 @@
 
 [Unit]
 Description=ProxyGuard API Proxy Server
-After=network.target
+After=network.target nginx.service
+Requires=nginx.service
 
 [Service]
 Type=simple
 User=proxyguard
+Group=proxyguard
 WorkingDirectory=/opt/proxyguard/server
 ExecStart=/usr/bin/node /opt/proxyguard/server/api-proxy.js
 Restart=on-failure
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=proxyguard-api
 Environment=NODE_ENV=production PORT=3000
 
 [Install]
