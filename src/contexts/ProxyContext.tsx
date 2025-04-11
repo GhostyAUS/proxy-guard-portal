@@ -35,20 +35,6 @@ interface ProxyContextType {
 
 const ProxyContext = createContext<ProxyContextType | undefined>(undefined);
 
-// In-memory store for development mode
-let inMemoryWhitelistGroups: WhitelistGroup[] = [];
-let inMemoryProxySettings: ProxySettings = {
-  nginxConfigPath: NGINX_CONFIG_PATH,
-  isReadOnly: false,
-  proxyPort: "8080",
-  authType: "none",
-  logSettings: {
-    accessLogPath: "/var/log/nginx/access.log",
-    errorLogPath: "/var/log/nginx/error.log",
-    deniedLogPath: "/var/log/nginx/denied.log"
-  }
-};
-
 export function ProxyProvider({ children }: { children: ReactNode }) {
   const [whitelistGroups, setWhitelistGroups] = useState<WhitelistGroup[]>([]);
   const [proxySettings, setProxySettings] = useState<ProxySettings>({
@@ -74,26 +60,13 @@ export function ProxyProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Check if we're in development mode
-  const isDev = import.meta.env.DEV || !import.meta.env.PROD;
-
   const fetchWhitelistGroups = async () => {
     setIsLoading(true);
     try {
-      if (isDev) {
-        // In development, use in-memory data or initialize with mock data if empty
-        if (inMemoryWhitelistGroups.length === 0) {
-          const groups = await readWhitelistGroups();
-          inMemoryWhitelistGroups = groups;
-        }
-        setWhitelistGroups(inMemoryWhitelistGroups);
-        setError(null);
-      } else {
-        // In production, call the API
-        const groups = await readWhitelistGroups();
-        setWhitelistGroups(groups);
-        setError(null);
-      }
+      // In production, call the API
+      const groups = await readWhitelistGroups();
+      setWhitelistGroups(groups);
+      setError(null);
     } catch (err) {
       console.error("Failed to fetch whitelist groups:", err);
       setError("Failed to fetch whitelist groups");
@@ -121,16 +94,8 @@ export function ProxyProvider({ children }: { children: ReactNode }) {
         updatedGroups = [...whitelistGroups, group];
       }
       
-      let success = false;
-      
-      if (isDev) {
-        // In development, just update the in-memory store
-        inMemoryWhitelistGroups = updatedGroups;
-        success = true;
-      } else {
-        // In production, call the API
-        success = await writeWhitelistGroups(updatedGroups);
-      }
+      // In production, call the API
+      const success = await writeWhitelistGroups(updatedGroups);
       
       if (success) {
         setWhitelistGroups(updatedGroups);
@@ -151,16 +116,8 @@ export function ProxyProvider({ children }: { children: ReactNode }) {
     try {
       const updatedGroups = whitelistGroups.filter(group => group.id !== groupId);
       
-      let success = false;
-      
-      if (isDev) {
-        // In development, just update the in-memory store
-        inMemoryWhitelistGroups = updatedGroups;
-        success = true;
-      } else {
-        // In production, call the API
-        success = await writeWhitelistGroups(updatedGroups);
-      }
+      // In production, call the API
+      const success = await writeWhitelistGroups(updatedGroups);
       
       if (success) {
         setWhitelistGroups(updatedGroups);
@@ -179,16 +136,8 @@ export function ProxyProvider({ children }: { children: ReactNode }) {
 
   const updateProxySettings = async (settings: ProxySettings): Promise<boolean> => {
     try {
-      let success = false;
-      
-      if (isDev) {
-        // In development, just update the in-memory store
-        inMemoryProxySettings = settings;
-        success = true;
-      } else {
-        // In production, call the API
-        success = await writeProxySettings(settings);
-      }
+      // In production, call the API
+      const success = await writeProxySettings(settings);
       
       if (success) {
         setProxySettings(settings);
@@ -207,24 +156,17 @@ export function ProxyProvider({ children }: { children: ReactNode }) {
 
   const reloadNginx = async (): Promise<boolean> => {
     try {
-      if (isDev) {
-        // In development, just simulate a successful reload
-        toast.success("Nginx configuration reloaded successfully (development mode)");
+      // In production, call the API
+      const success = await reloadNginxConfig();
+      
+      if (success) {
+        toast.success("Nginx configuration reloaded successfully");
         await checkStatus();
-        return true;
       } else {
-        // In production, call the API
-        const success = await reloadNginxConfig();
-        
-        if (success) {
-          toast.success("Nginx configuration reloaded successfully");
-          await checkStatus();
-        } else {
-          toast.error("Failed to reload Nginx configuration");
-        }
-        
-        return success;
+        toast.error("Failed to reload Nginx configuration");
       }
+      
+      return success;
     } catch (err) {
       console.error("Failed to reload Nginx:", err);
       toast.error("Failed to reload Nginx configuration");
@@ -234,22 +176,9 @@ export function ProxyProvider({ children }: { children: ReactNode }) {
 
   const checkStatus = async (): Promise<void> => {
     try {
-      if (isDev) {
-        // In development, simulate a mock status
-        setNginxStatus({
-          isRunning: true,
-          lastConfigTest: {
-            success: true,
-            message: 'Development mode: Configuration test would be successful'
-          },
-          lastModified: new Date().toISOString(),
-          configWritable: true
-        });
-      } else {
-        // In production, call the API
-        const status = await checkNginxStatus();
-        setNginxStatus(status);
-      }
+      // In production, call the API
+      const status = await checkNginxStatus();
+      setNginxStatus(status);
     } catch (err) {
       console.error("Failed to check Nginx status:", err);
       toast.error("Failed to check Nginx status");
@@ -259,13 +188,6 @@ export function ProxyProvider({ children }: { children: ReactNode }) {
   // Generate and apply the nginx configuration
   const applyConfiguration = async (): Promise<boolean> => {
     try {
-      if (isDev) {
-        // In development mode, simulate success
-        toast.success("Configuration applied successfully (development mode)");
-        await checkStatus();
-        return true;
-      }
-      
       // Generate the configuration from our groups using the template
       const generatedConfig = generateNginxConfig(
         whitelistGroups,
@@ -311,36 +233,14 @@ export function ProxyProvider({ children }: { children: ReactNode }) {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        if (isDev) {
-          // In development, use in-memory data or initialize with mock data
-          if (inMemoryWhitelistGroups.length === 0) {
-            // Initialize with mock data
-            const groups = await readWhitelistGroups();
-            inMemoryWhitelistGroups = groups;
-          }
-          setWhitelistGroups(inMemoryWhitelistGroups);
-          setProxySettings(inMemoryProxySettings);
-          
-          // Set a mock status for development
-          setNginxStatus({
-            isRunning: true,
-            lastConfigTest: {
-              success: true,
-              message: 'Development mode: Configuration test would be successful'
-            },
-            lastModified: new Date().toISOString(),
-            configWritable: true
-          });
-        } else {
-          // In production, load from API
-          const groups = await readWhitelistGroups();
-          setWhitelistGroups(groups);
-          
-          const settings = await readProxySettings();
-          setProxySettings(settings);
-          
-          await checkStatus();
-        }
+        // In production, load from API
+        const groups = await readWhitelistGroups();
+        setWhitelistGroups(groups);
+        
+        const settings = await readProxySettings();
+        setProxySettings(settings);
+        
+        await checkStatus();
         
         setError(null);
       } catch (err) {
