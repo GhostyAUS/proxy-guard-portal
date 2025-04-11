@@ -21,7 +21,7 @@ http {
     # Log file paths
     access_log /var/log/nginx/access.log main;
     error_log /var/log/nginx/error.log info;
-    access_log /var/log/nginx/denied.log denied if=$status ~* ^4;
+    access_log /var/log/nginx/denied.log denied if=$status ~ ^4;
     
     # CLIENT GROUP DEFINITIONS
     geo $remote_addr $client_group {
@@ -63,7 +63,7 @@ http {
                     set $allow_default_group 1;
                 }
                 # Google wildcard domain
-                if ($host ~* "^.*\\.google\\.com$") {
+                if ($host ~ ".*\.google\.com$") {
                     set $allow_default_group 1;
                 }
             }

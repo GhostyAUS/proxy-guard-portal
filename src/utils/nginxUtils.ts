@@ -51,7 +51,7 @@ ${enabledGroups.map((group) => {
             // Handle wildcard domains with regex
             const pattern = dest.value.replace(/\*/g, '').replace(/\./g, '\\.');
             return `# ${dest.description || 'Wildcard domain'}
-        if ($host ~* "^.*${pattern}$") {
+        if ($host ~ ".*${pattern}$") {
             set $allow_${safeGroupId} 1;
         }`;
           } else {
@@ -97,7 +97,7 @@ ${enabledGroups.map(group => {
     # Log file paths
     access_log /var/log/nginx/access.log main;
     error_log /var/log/nginx/error.log info;
-    access_log /var/log/nginx/denied.log denied if=$status ~* ^4;`;
+    access_log /var/log/nginx/denied.log denied if=$status ~ ^4;`;
 
     // Proxy settings
     const proxySettings = `
@@ -142,7 +142,7 @@ geo $remote_addr $client_group {
     # Log file paths  
     access_log /var/log/nginx/access.log main;
     error_log /var/log/nginx/error.log info;
-    access_log /var/log/nginx/denied.log denied if=$status ~* ^4;`;
+    access_log /var/log/nginx/denied.log denied if=$status ~ ^4;`;
     
     serverLocations = `
     # Default access rule (no groups enabled)
@@ -355,7 +355,7 @@ export const executePrivilegedCommand = async (command: string): Promise<{ succe
 // Updated nginx template to match the structure of the provided configuration
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
-daemon off;
+error_log /var/log/nginx/error.log info;
 
 events {
     worker_connections 1024;
