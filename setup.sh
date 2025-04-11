@@ -7,6 +7,9 @@
 # Exit on error
 set -e
 
+# Get the absolute path of the script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 echo "Setting up ProxyGuard on Ubuntu server..."
 
 # Install Node.js and npm if not already installed
@@ -48,8 +51,12 @@ sudo chmod 755 /var/log/proxyguard
 
 # Copy application files to installation directory
 echo "Copying application files..."
-sudo cp -r ./* $APP_DIR/
-sudo chown -R proxyguard:proxyguard $APP_DIR
+if [ "$SCRIPT_DIR" != "$APP_DIR" ]; then
+  sudo cp -r "$SCRIPT_DIR"/* $APP_DIR/
+  sudo chown -R proxyguard:proxyguard $APP_DIR
+else
+  echo "Already in destination directory. Skipping copy."
+fi
 
 # Generate self-signed SSL certificates (for development)
 echo "Generating self-signed SSL certificates..."
@@ -65,7 +72,7 @@ sudo chmod 644 /etc/nginx/certs/server.crt
 
 # Install command execution script
 echo "Setting up command execution script..."
-sudo cp $APP_DIR/proxyguard-exec.sh /usr/local/bin/proxyguard-exec
+sudo cp "$APP_DIR/proxyguard-exec.sh" /usr/local/bin/proxyguard-exec
 sudo chmod 755 /usr/local/bin/proxyguard-exec
 
 # Set up sudo permissions for the execution script
@@ -139,3 +146,4 @@ echo "- Setting up a proper domain name and SSL certificates"
 echo "- Configuring firewall rules to restrict access"
 echo "- Setting up monitoring and alerts"
 echo "====================================================="
+

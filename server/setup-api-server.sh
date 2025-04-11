@@ -7,6 +7,7 @@
 # Exit on error
 set -e
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 echo "Setting up ProxyGuard API Proxy Server..."
 
 # Install required Node.js packages
@@ -63,7 +64,15 @@ fi
 # Copy API server to installation directory
 echo "Installing API proxy server..."
 sudo mkdir -p /opt/proxyguard/server
-sudo cp api-proxy.js /opt/proxyguard/server/
+API_JS_SOURCE="$SCRIPT_DIR/api-proxy.js"
+API_JS_DEST="/opt/proxyguard/server/api-proxy.js"
+
+if [ "$API_JS_SOURCE" = "$API_JS_DEST" ]; then
+  echo "Source and destination are the same file. Skipping copy."
+else
+  sudo cp "$API_JS_SOURCE" "$API_JS_DEST"
+fi
+
 sudo chmod +x /opt/proxyguard/server/api-proxy.js
 sudo chown -R proxyguard:proxyguard /opt/proxyguard/server
 
@@ -74,13 +83,15 @@ sudo chmod g+r /etc/nginx/nginx.conf
 
 # Install service file
 echo "Installing systemd service..."
-sudo cp proxyguard-api.service /etc/systemd/system/
+SERVICE_FILE="$SCRIPT_DIR/../server/proxyguard-api.service"
+sudo cp "$SERVICE_FILE" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable proxyguard-api.service
 
 # Install command execution script
 echo "Setting up command execution script..."
-sudo cp ../proxyguard-exec.sh /usr/local/bin/proxyguard-exec
+EXEC_SCRIPT="$SCRIPT_DIR/../proxyguard-exec.sh"
+sudo cp "$EXEC_SCRIPT" /usr/local/bin/proxyguard-exec
 sudo chmod 755 /usr/local/bin/proxyguard-exec
 
 # Set up sudo permissions for the execution script
@@ -101,3 +112,4 @@ echo "====================================================="
 echo "ProxyGuard API Proxy Server installation complete!"
 echo "The API server is running on port 3000"
 echo "====================================================="
+
