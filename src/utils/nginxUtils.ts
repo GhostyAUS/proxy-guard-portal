@@ -1,3 +1,4 @@
+
 import { WhitelistGroup } from "@/types/proxy";
 import { toast } from "sonner";
 
@@ -6,6 +7,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Path to the Nginx configuration file on the server
 const NGINX_CONFIG_PATH = "/etc/nginx/nginx.conf";
+
+// Path to the command execution script
+const COMMAND_SCRIPT_PATH = "/usr/local/bin/proxyguard-exec";
 
 export const generateNginxConfig = (groups: WhitelistGroup[], configTemplate: string): string => {
   // Start with the base template
@@ -147,17 +151,14 @@ export const reloadNginxConfig = async (): Promise<boolean> => {
       return true;
     }
     
-    // In production, reload via the API
-    const response = await fetch(`${API_BASE_URL}/nginx/reload`, {
-      method: 'POST',
-    });
+    // Execute the reload command directly via the script
+    const result = await executePrivilegedCommand("reload_nginx");
     
-    if (response.ok) {
+    if (result.success) {
       toast.success("Nginx configuration reloaded successfully");
       return true;
     } else {
-      const result = await response.json();
-      toast.error(`Failed to reload Nginx configuration: ${result.message || 'Unknown error'}`);
+      toast.error(`Failed to reload Nginx configuration: ${result.output}`);
       return false;
     }
   } catch (error) {
@@ -175,17 +176,16 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
       return true;
     }
     
-    // In production, check via the API
-    const response = await fetch(`${API_BASE_URL}/nginx/writable?path=${encodeURIComponent(configPath)}`);
-    const result = await response.json();
-    return result.writable || false;
+    // Check if the config file is writable via the script
+    const result = await executePrivilegedCommand(`check_writable ${configPath}`);
+    return result.success;
   } catch (error) {
     console.error("File access error:", error);
     return false;
   }
 };
 
-// Execute a command with elevated privileges
+// Execute a command with elevated privileges using a local script
 export const executePrivilegedCommand = async (command: string): Promise<{ success: boolean; output: string }> => {
   try {
     if (import.meta.env.DEV) {
@@ -196,29 +196,51 @@ export const executePrivilegedCommand = async (command: string): Promise<{ succe
       };
     }
     
-    // In production, execute the command via the API
-    const response = await fetch(`${API_BASE_URL}/system/execute`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ command }),
-    });
+    // In production, execute the command via the local script
+    const scriptCommand = `${COMMAND_SCRIPT_PATH} ${command}`;
     
-    const result = await response.json();
-    
-    if (response.ok) {
-      toast.success("Command executed successfully");
-      return { 
-        success: true, 
-        output: result.output || 'Command executed successfully' 
-      };
+    // Use the Electron API if available, otherwise fall back to fetch API
+    if (window.electron) {
+      const result = await window.electron.execute(scriptCommand);
+      
+      if (result.exitCode === 0) {
+        toast.success("Command executed successfully");
+        return { 
+          success: true, 
+          output: result.stdout || 'Command executed successfully' 
+        };
+      } else {
+        toast.error(`Failed to execute command: ${result.stderr || 'Unknown error'}`);
+        return { 
+          success: false, 
+          output: result.stderr || 'Command execution failed' 
+        };
+      }
     } else {
-      toast.error(`Failed to execute command: ${result.message || 'Unknown error'}`);
-      return { 
-        success: false, 
-        output: result.message || 'Failed to execute command' 
-      };
+      // Fallback to API for web environments
+      const response = await fetch(`${API_BASE_URL}/system/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ command }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        toast.success("Command executed successfully");
+        return { 
+          success: true, 
+          output: result.output || 'Command executed successfully' 
+        };
+      } else {
+        toast.error(`Failed to execute command: ${result.message || 'Unknown error'}`);
+        return { 
+          success: false, 
+          output: result.message || 'Failed to execute command' 
+        };
+      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

@@ -37,6 +37,11 @@ npm install
 echo "Building the application..."
 npm run build
 
+# Install the command execution script
+echo "Setting up command execution script..."
+sudo cp proxyguard-exec.sh /usr/local/bin/proxyguard-exec
+sudo chmod 755 /usr/local/bin/proxyguard-exec
+
 # Create a service file for the application
 echo "Creating systemd service for the application..."
 cat > proxyguard.service << EOL
@@ -65,6 +70,16 @@ sudo systemctl start proxyguard.service
 # Run the Nginx setup script
 echo "Setting up Nginx proxy server..."
 cd $APP_DIR/nginx && bash install.sh
+
+# Set up sudo permissions for the execution script
+echo "Setting up sudo permissions..."
+cat > proxyguard_sudo << EOL
+# Allow the ProxyGuard user to execute specific commands without password
+%proxyguard ALL=(ALL) NOPASSWD: /usr/local/bin/proxyguard-exec
+EOL
+
+sudo mv proxyguard_sudo /etc/sudoers.d/proxyguard
+sudo chmod 440 /etc/sudoers.d/proxyguard
 
 echo "====================================================="
 echo "ProxyGuard installation complete!"

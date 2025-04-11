@@ -59,10 +59,6 @@ sudo chmod g+w /etc/nginx/nginx.conf
 sudo chmod g+w /etc/proxyguard/whitelist.json
 sudo chmod g+w /etc/proxyguard/settings.json
 
-# Setup sudoers entry to allow nginx restart without password
-echo "Setting up sudoers for nginx service management..."
-echo "%proxyguard ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx, /bin/systemctl reload nginx, /bin/systemctl status nginx" | sudo EDITOR='tee -a' visudo
-
 # Restart Nginx
 echo "Restarting Nginx service..."
 sudo systemctl restart nginx
