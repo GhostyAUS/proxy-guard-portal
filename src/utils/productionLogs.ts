@@ -2,6 +2,7 @@
 import { LogEntry, LogStats } from "@/types/logs";
 import fs from 'fs';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 // Configuration
 const LOG_FILE_PATH = process.env.LOG_FILE_PATH || '/var/log/proxyguard/access.log';
@@ -13,7 +14,21 @@ export const readLogsFromFile = async (): Promise<LogEntry[]> => {
     // Check if log file exists
     if (!fs.existsSync(LOG_FILE_PATH)) {
       console.error(`Log file not found: ${LOG_FILE_PATH}`);
-      return [];
+      
+      // Generate a sample log entry to show the functionality
+      const sampleLog: LogEntry = {
+        id: uuidv4(),
+        timestamp: new Date().toISOString(),
+        clientIp: '127.0.0.1',
+        destination: 'example.com',
+        status: 'allowed',
+        method: 'GET',
+        userAgent: 'Sample/1.0',
+        reason: 'This is a sample log entry since the log file is not available',
+      };
+      
+      // Throw error to be caught by caller
+      throw new Error(`Log file not found: ${LOG_FILE_PATH}`);
     }
 
     const logData = fs.readFileSync(LOG_FILE_PATH, 'utf8');

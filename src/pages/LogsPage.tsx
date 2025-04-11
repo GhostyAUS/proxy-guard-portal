@@ -9,7 +9,17 @@ import { RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function LogsPage() {
-  const { logs, stats, isLoading, fetchLogs, clearLogs, startRealTimeUpdates, stopRealTimeUpdates, isRealTimeEnabled } = useLogs();
+  const { 
+    logs, 
+    stats, 
+    isLoading, 
+    fetchLogs, 
+    clearLogs, 
+    startRealTimeUpdates, 
+    stopRealTimeUpdates, 
+    isRealTimeEnabled,
+    filesAvailable 
+  } = useLogs();
   const { toast } = useToast();
   
   useEffect(() => {
@@ -65,6 +75,7 @@ export default function LogsPage() {
           isRealTimeEnabled={isRealTimeEnabled}
           onToggleRealTime={handleToggleRealTime}
           onClearLogs={handleClearLogs}
+          filesAvailable={filesAvailable}
         />
 
         <div className="space-y-4 mt-4">

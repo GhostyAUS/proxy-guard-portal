@@ -3,12 +3,14 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { LogEntry, LogStats } from "@/types/logs";
 import { readLogsFromFile, getLogStats, writeLogEntry } from "@/utils/productionLogs";
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from "sonner";
 
 interface LogsContextType {
   logs: LogEntry[];
   stats: LogStats;
   isLoading: boolean;
   error: string | null;
+  filesAvailable: boolean;
   fetchLogs: () => void;
   clearLogs: () => void;
   startRealTimeUpdates: () => void;
@@ -32,6 +34,7 @@ export function LogsProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isRealTimeEnabled, setIsRealTimeEnabled] = useState(false);
   const [updateInterval, setUpdateInterval] = useState<number | null>(null);
+  const [filesAvailable, setFilesAvailable] = useState(true);
 
   const fetchLogs = async () => {
     setIsLoading(true);
@@ -45,9 +48,15 @@ export function LogsProvider({ children }: { children: ReactNode }) {
       setStats(logStats);
       
       setError(null);
+      setFilesAvailable(true);
     } catch (err) {
-      setError("Failed to fetch logs");
       console.error(err);
+      setError("Failed to fetch logs");
+      setFilesAvailable(false);
+      // Show a toast notification for the error
+      toast.error("Log files are not available", {
+        description: "The system could not access the required log files"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +83,13 @@ export function LogsProvider({ children }: { children: ReactNode }) {
   };
 
   const startRealTimeUpdates = () => {
+    if (!filesAvailable) {
+      toast.error("Cannot enable real-time updates", {
+        description: "Log files are not accessible"
+      });
+      return;
+    }
+    
     setIsRealTimeEnabled(true);
     const interval = window.setInterval(() => {
       addRandomLog();
@@ -105,6 +121,7 @@ export function LogsProvider({ children }: { children: ReactNode }) {
         stats,
         isLoading,
         error,
+        filesAvailable,
         fetchLogs,
         clearLogs,
         startRealTimeUpdates,
