@@ -1,18 +1,16 @@
 
 #!/bin/bash
 
-FRONTEND_JS="/opt/proxyguard/start-frontend.js"
+# Exit on error
+set -e
 
-# Check if the file exists
-if [ ! -f "$FRONTEND_JS" ]; then
-  echo "Error: $FRONTEND_JS not found!"
-  echo "Creating the frontend starter script..."
-  
-  # Create the directory if it doesn't exist
-  mkdir -p /opt/proxyguard
-  
-  # Create the start-frontend.js file
-  cat > /opt/proxyguard/start-frontend.js << 'EOL'
+echo "ProxyGuard Frontend Fix Script"
+echo "============================="
+echo "This script will fix missing start-frontend.js issues"
+
+# Create the start-frontend.js file
+echo "Creating start-frontend.js file..."
+cat > /opt/proxyguard/start-frontend.js << 'EOL'
 #!/usr/bin/env node
 
 /**
@@ -51,9 +49,15 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`ProxyGuard frontend server running on port ${PORT} (all interfaces)`);
 });
 EOL
-fi
 
-# Make the start-frontend.js file executable
+# Make the file executable
 chmod +x /opt/proxyguard/start-frontend.js
-echo "Frontend starter script is now executable"
+echo "File created and made executable."
+
+# Restart the service
+echo "Restarting the frontend service..."
+systemctl restart proxyguard-frontend.service
+
+echo "Done! The ProxyGuard frontend service should now be running."
+echo "You can check its status with: systemctl status proxyguard-frontend.service"
 

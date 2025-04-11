@@ -59,6 +59,7 @@ else
 fi
 
 # Make scripts executable
+echo "Making scripts executable..."
 sudo chmod +x $APP_DIR/server/generate-api-key.sh
 sudo chmod +x $APP_DIR/opt/proxyguard/make-frontend-executable.sh
 sudo chmod +x $APP_DIR/opt/proxyguard/setup-frontend-service.sh
@@ -106,6 +107,10 @@ sudo -u proxyguard npm install
 echo "Building the application..."
 sudo -u proxyguard npm run build
 
+# Create the start-frontend.js file explicitly
+echo "Creating frontend starter script..."
+bash $APP_DIR/opt/proxyguard/make-frontend-executable.sh
+
 # Set up Nginx configuration
 echo "Setting up Nginx proxy server..."
 cd $APP_DIR/nginx && sudo bash install.sh
@@ -116,7 +121,6 @@ cd $APP_DIR/server && sudo bash setup-api-server.sh
 
 # Set up frontend server
 echo "Setting up frontend server..."
-cd $APP_DIR && sudo bash opt/proxyguard/make-frontend-executable.sh
 cd $APP_DIR && sudo bash opt/proxyguard/setup-frontend-service.sh
 
 echo "====================================================="
@@ -131,3 +135,4 @@ echo "- Setting up a proper domain name and SSL certificates"
 echo "- Configuring firewall rules to restrict access"
 echo "- Setting up monitoring and alerts"
 echo "====================================================="
+
