@@ -9,7 +9,7 @@ echo "Setting up ProxyGuard Frontend Service..."
 # Make sure the frontend script exists and is executable
 if [ ! -f "/opt/proxyguard/start-frontend.js" ]; then
   echo "Frontend script not found. Creating it now..."
-  bash /opt/proxyguard/opt/proxyguard/make-frontend-executable.sh
+  bash /opt/proxyguard/fix-frontend.sh
 else
   echo "Frontend script found. Making it executable..."
   chmod +x /opt/proxyguard/start-frontend.js
@@ -32,4 +32,3 @@ systemctl status proxyguard-api.service --no-pager || true
 systemctl status proxyguard-frontend.service --no-pager || true
 
 echo "ProxyGuard Frontend Service setup complete!"
-
