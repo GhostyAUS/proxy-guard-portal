@@ -185,6 +185,52 @@ export const testConfigWritable = async (configPath: string): Promise<boolean> =
   }
 };
 
+// Execute a command with elevated privileges
+export const executePrivilegedCommand = async (command: string): Promise<{ success: boolean; output: string }> => {
+  try {
+    if (import.meta.env.DEV) {
+      console.log("Running in dev mode, simulating privileged command:", command);
+      return { 
+        success: true, 
+        output: `Development mode: Would execute "${command}" with elevated privileges` 
+      };
+    }
+    
+    // In production, execute the command via the API
+    const response = await fetch(`${API_BASE_URL}/system/execute`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ command }),
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      toast.success("Command executed successfully");
+      return { 
+        success: true, 
+        output: result.output || 'Command executed successfully' 
+      };
+    } else {
+      toast.error(`Failed to execute command: ${result.message || 'Unknown error'}`);
+      return { 
+        success: false, 
+        output: result.message || 'Failed to execute command' 
+      };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    toast.error(`Failed to execute command: ${errorMessage}`);
+    console.error("Command execution error:", error);
+    return { 
+      success: false, 
+      output: `Error: ${errorMessage}` 
+    };
+  }
+};
+
 // Updated nginx combined proxy template with simplified configuration
 export const DEFAULT_NGINX_TEMPLATE = `
 worker_processes auto;
