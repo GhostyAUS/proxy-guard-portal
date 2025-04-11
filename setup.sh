@@ -36,14 +36,17 @@ npm install
 # Add start script to package.json if it doesn't exist
 echo "Adding start script to package.json..."
 if ! grep -q '"start":' package.json; then
-  # Use temporary file to avoid issues with inline editing
-  jq '.scripts.start = "vite preview --host 0.0.0.0 --port 3000"' package.json > package.json.tmp
-  mv package.json.tmp package.json
-  # If jq is not available, use this alternative
-  if [ $? -ne 0 ]; then
-    # Alternative method if jq fails
+  # Try with jq if available
+  if command -v jq &> /dev/null; then
+    jq '.scripts.start = "vite preview --host 0.0.0.0 --port 3000"' package.json > package.json.tmp
+    mv package.json.tmp package.json
+  else
+    # Fallback to sed
     sed -i 's/"scripts": {/"scripts": {\n    "start": "vite preview --host 0.0.0.0 --port 3000",/g' package.json
   fi
+  echo "Start script added successfully!"
+else
+  echo "Start script already exists."
 fi
 
 # Build the application
