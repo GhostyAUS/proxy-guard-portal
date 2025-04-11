@@ -2,11 +2,40 @@
 import { useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { useLogs } from "@/contexts/LogsContext";
-import { LogStatsCard } from "@/components/logs/LogStats";
-import { LogTable } from "@/components/logs/LogTable";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+// Temporary placeholder components until we implement full dashboard logging
+const LogStatsCard = ({ 
+  stats, 
+  isRealTimeEnabled, 
+  onToggleRealTime, 
+  onClearLogs, 
+  filesAvailable 
+}: { 
+  stats: any; 
+  isRealTimeEnabled: boolean; 
+  onToggleRealTime: () => void; 
+  onClearLogs: () => void; 
+  filesAvailable: boolean; 
+}) => {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
+        <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <h3 className="tracking-tight text-sm font-medium">Total Requests</h3>
+        </div>
+        <div className="text-2xl font-bold">{stats?.totalRequests || 0}</div>
+      </div>
+    </div>
+  );
+};
+
+const LogTable = ({ logs }: { logs: any[] }) => {
+  // This component is not actually used when dashboardLoggingEnabled is false
+  return <div>Log entries will be displayed here</div>;
+};
 
 export default function LogsPage() {
   const { 
