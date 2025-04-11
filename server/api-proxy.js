@@ -1,6 +1,3 @@
-
-#!/usr/bin/env node
-
 /**
  * ProxyGuard API Proxy Server
  * 
