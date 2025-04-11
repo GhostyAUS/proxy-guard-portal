@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from "@/components/ui/sonner";
 import { LogsProvider } from './contexts/LogsContext';
 import { ProxyProvider } from './contexts/ProxyContext';
@@ -27,8 +27,9 @@ function App() {
             <Route path="/https-proxy" element={<HttpsProxy />} />
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/whitelist" element={<WhitelistGroups />} />
-            <Route path="/whitelist/:id" element={<WhitelistDetail />} />
+            {/* Fixed route order - specific routes before dynamic routes */}
             <Route path="/whitelist/create" element={<WhitelistDetail />} />
+            <Route path="/whitelist/:id" element={<WhitelistDetail />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/documentation" element={<Documentation />} />
             <Route path="*" element={<NotFound />} />
