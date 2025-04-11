@@ -363,7 +363,7 @@ http {
 # PLACEHOLDER:ACCESS_CONDITIONS
     
     server {
-        listen 8080;
+        listen 0.0.0.0:8080;
         resolver 8.8.8.8 ipv6=off;
         
         # Security headers
