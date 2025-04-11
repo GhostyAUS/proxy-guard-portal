@@ -7,6 +7,7 @@ const API_BASE_URL = '/api';
 // Function to read whitelist groups from configuration file via the API
 export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
   try {
+    console.log('Fetching whitelist groups from API...');
     // Call the API endpoint
     const response = await fetch(`${API_BASE_URL}/whitelist`, {
       headers: {
@@ -16,10 +17,14 @@ export const readWhitelistGroups = async (): Promise<WhitelistGroup[]> => {
     });
     
     if (!response.ok) {
+      const text = await response.text();
+      console.error('API response not OK:', response.status, text);
       throw new Error(`API error: ${response.status}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    console.log('Received whitelist data:', data);
+    return data;
   } catch (error) {
     console.error("Failed to read whitelist groups:", error);
     throw error;
