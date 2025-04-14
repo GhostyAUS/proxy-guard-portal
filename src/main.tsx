@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// Simple root rendering with Router handling inside App component
+// Simple root rendering without Router
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

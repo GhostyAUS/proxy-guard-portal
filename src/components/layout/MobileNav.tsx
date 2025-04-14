@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   FileText,
@@ -11,7 +10,6 @@ import {
   Server,
   Settings,
   Shield,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -19,40 +17,45 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const navigation = [
   {
     name: "Dashboard",
-    href: "/",
+    href: "#",
     icon: Home,
+    active: true,
   },
   {
     name: "Whitelist Groups",
-    href: "/whitelist",
+    href: "#",
     icon: ListFilter,
+    active: false,
   },
   {
     name: "HTTP Proxy",
-    href: "/http-proxy",
+    href: "#",
     icon: Globe,
+    active: false,
   },
   {
     name: "HTTPS Proxy",
-    href: "/https-proxy",
+    href: "#",
     icon: Shield,
+    active: false,
   },
   {
     name: "Settings",
-    href: "/settings",
+    href: "#",
     icon: Settings,
+    active: false,
   },
   {
     name: "Documentation",
-    href: "/documentation",
+    href: "#",
     icon: FileText,
+    active: false,
   },
 ];
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
-  const location = useLocation();
-
+  
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild className="md:hidden">
@@ -71,11 +74,11 @@ export function MobileNav() {
           <ul className="grid gap-1 px-2">
             {navigation.map((item) => (
               <li key={item.name}>
-                <Link
-                  to={item.href}
+                <a
+                  href={item.href}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    location.pathname === item.href
+                    item.active
                       ? "bg-accent text-accent-foreground"
                       : "text-foreground/80 hover:bg-accent/50 hover:text-accent-foreground"
                   )}
@@ -83,7 +86,7 @@ export function MobileNav() {
                 >
                   <item.icon className="h-4 w-4" />
                   {item.name}
-                </Link>
+                </a>
               </li>
             ))}
           </ul>

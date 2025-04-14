@@ -1,5 +1,4 @@
 
-import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
   FileText, 
@@ -11,42 +10,47 @@ import {
   Shield 
 } from "lucide-react";
 
+// Navigation items for sidebar
 const navigation = [
   {
     name: "Dashboard",
-    href: "/",
+    href: "#",
     icon: Home,
+    active: true,
   },
   {
     name: "Whitelist Groups",
-    href: "/whitelist",
+    href: "#",
     icon: ListFilter,
+    active: false,
   },
   {
     name: "HTTP Proxy",
-    href: "/http-proxy",
+    href: "#",
     icon: Globe,
+    active: false,
   },
   {
     name: "HTTPS Proxy",
-    href: "/https-proxy",
+    href: "#",
     icon: Shield,
+    active: false,
   },
   {
     name: "Settings",
-    href: "/settings",
+    href: "#",
     icon: Settings,
+    active: false,
   },
   {
     name: "Documentation",
-    href: "/documentation",
+    href: "#",
     icon: FileText,
+    active: false,
   },
 ];
 
 export function Sidebar() {
-  const location = useLocation();
-
   return (
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r bg-sidebar md:flex">
       <div className="flex h-16 items-center gap-2 border-b px-6">
@@ -61,18 +65,18 @@ export function Sidebar() {
         <ul className="grid gap-1 px-2">
           {navigation.map((item) => (
             <li key={item.name}>
-              <Link
-                to={item.href}
+              <a
+                href={item.href}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  location.pathname === item.href
+                  item.active
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                 )}
               >
                 <item.icon className="h-4 w-4" />
                 {item.name}
-              </Link>
+              </a>
             </li>
           ))}
         </ul>

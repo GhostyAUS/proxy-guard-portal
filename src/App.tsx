@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
 import { Toaster } from "@/components/ui/sonner";
 import { LogsProvider } from './contexts/LogsContext';
 import { ProxyProvider } from './contexts/ProxyContext';
@@ -12,10 +11,8 @@ function App() {
   return (
     <ProxyProvider>
       <LogsProvider>
-        <Router>
-          <Dashboard />
-          <Toaster />
-        </Router>
+        <Dashboard />
+        <Toaster />
       </LogsProvider>
     </ProxyProvider>
   );
