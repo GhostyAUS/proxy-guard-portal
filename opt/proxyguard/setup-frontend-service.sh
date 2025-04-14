@@ -19,9 +19,9 @@ else
   bash /opt/proxyguard/fix-frontend.sh
 fi
 
-# Update the systemd service file to remove deprecated options
+# Update the systemd service file
 echo "Updating systemd service file..."
-cat > /opt/proxyguard/server/proxyguard-frontend.service << 'EOL'
+cat > /etc/systemd/system/proxyguard-frontend.service << 'EOL'
 [Unit]
 Description=ProxyGuard Frontend Application
 After=network.target proxyguard-api.service
@@ -46,7 +46,6 @@ EOL
 
 # Install the frontend service
 echo "Installing systemd service..."
-cp /opt/proxyguard/server/proxyguard-frontend.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable proxyguard-frontend.service
 

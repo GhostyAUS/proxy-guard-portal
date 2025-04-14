@@ -1,40 +1,17 @@
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from "@/components/ui/sonner";
 import { LogsProvider } from './contexts/LogsContext';
 import { ProxyProvider } from './contexts/ProxyContext';
 
-// Import pages
+// Import the Dashboard as our main component
 import Dashboard from '@/pages/Index';
-import HttpProxy from '@/pages/HttpProxy';
-import HttpsProxy from '@/pages/HttpsProxy';
-import LogsPage from '@/pages/LogsPage';
-import WhitelistGroups from '@/pages/WhitelistGroups';
-import WhitelistDetail from '@/pages/WhitelistDetail';
-import Settings from '@/pages/Settings';
-import Documentation from '@/pages/Documentation';
-import NotFound from '@/pages/NotFound';
 
 function App() {
   return (
     <ProxyProvider>
       <LogsProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/http-proxy" element={<HttpProxy />} />
-            <Route path="/https-proxy" element={<HttpsProxy />} />
-            <Route path="/logs" element={<LogsPage />} />
-            <Route path="/whitelist" element={<WhitelistGroups />} />
-            {/* Fixed route order - specific routes before dynamic routes */}
-            <Route path="/whitelist/create" element={<WhitelistDetail />} />
-            <Route path="/whitelist/:id" element={<WhitelistDetail />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/documentation" element={<Documentation />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Router>
+        <Dashboard />
         <Toaster />
       </LogsProvider>
     </ProxyProvider>

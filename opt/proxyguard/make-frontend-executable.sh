@@ -54,7 +54,7 @@ app.use((req, res, next) => {
 // Serve static files from the build directory
 app.use(express.static(STATIC_FILES_PATH));
 
-// For any route, serve the index.html file and let the client handle routing
+// For any route, serve the index.html file
 app.get('*', (req, res) => {
   res.sendFile(path.join(STATIC_FILES_PATH, 'index.html'));
 });
