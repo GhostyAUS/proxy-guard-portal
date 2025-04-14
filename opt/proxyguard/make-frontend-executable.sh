@@ -1,17 +1,15 @@
 
 #!/bin/bash
 
-FRONTEND_JS="/opt/proxyguard/start-frontend.js"
+# Exit on error
+set -e
 
-# Check if the file exists
-if [ ! -f "$FRONTEND_JS" ]; then
-  echo "Error: $FRONTEND_JS not found!"
-  echo "Creating the frontend starter script..."
-  
-  # Create the directory if it doesn't exist
-  mkdir -p /opt/proxyguard
-  
-  # Create the start-frontend.js file
+echo "Making ProxyGuard Frontend Executable"
+echo "===================================="
+
+# Create the start-frontend.js file if it doesn't exist
+if [ ! -f "/opt/proxyguard/start-frontend.js" ]; then
+  echo "Creating start-frontend.js file..."
   cat > /opt/proxyguard/start-frontend.js << 'EOL'
 #!/usr/bin/env node
 
@@ -54,7 +52,7 @@ app.use((req, res, next) => {
 // Serve static files from the build directory
 app.use(express.static(STATIC_FILES_PATH));
 
-// For any route, serve the index.html file
+// For any route, serve the index.html file and let client-side React Router handle routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(STATIC_FILES_PATH, 'index.html'));
 });
@@ -68,6 +66,9 @@ app.listen(PORT, '0.0.0.0', () => {
 EOL
 fi
 
-# Make the start-frontend.js file executable
+# Make the file executable
 chmod +x /opt/proxyguard/start-frontend.js
-echo "Frontend starter script is now executable"
+echo "start-frontend.js has been made executable."
+
+# Create a simple test file to verify the environment
+echo "Done! The frontend script is now executable."
