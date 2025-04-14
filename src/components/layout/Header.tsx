@@ -1,6 +1,5 @@
 
 import { AlertCircle, Bell, Settings } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -22,15 +21,15 @@ export function Header() {
   return (
     <header className="sticky top-0 z-30 w-full border-b bg-background">
       <div className="flex h-16 items-center px-4 md:px-6">
-        <Link 
-          to="/" 
+        <a 
+          href="/" 
           className="flex items-center gap-2 font-semibold text-lg"
         >
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
             <div className="h-3 w-3 rounded-sm bg-primary-foreground" />
           </div>
           <span className="hidden md:inline-flex">Proxy Guard</span>
-        </Link>
+        </a>
         
         <div className="ml-auto flex items-center gap-2">
           <DropdownMenu>
@@ -69,16 +68,16 @@ export function Header() {
                 </div>
               )}
               <DropdownMenuItem asChild className="justify-center cursor-pointer">
-                <Link to="/notifications" className="w-full">View all</Link>
+                <a href="/notifications" className="w-full">View all</a>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           
-          <Link to="/settings">
+          <a href="/settings">
             <Button variant="outline" size="icon">
               <Settings className="h-4 w-4" />
             </Button>
-          </Link>
+          </a>
         </div>
       </div>
     </header>

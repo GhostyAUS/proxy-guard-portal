@@ -17,37 +17,37 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const navigation = [
   {
     name: "Dashboard",
-    href: "#",
+    href: "/",
     icon: Home,
     active: true,
   },
   {
     name: "Whitelist Groups",
-    href: "#",
+    href: "/whitelist",
     icon: ListFilter,
     active: false,
   },
   {
     name: "HTTP Proxy",
-    href: "#",
+    href: "/http-proxy",
     icon: Globe,
     active: false,
   },
   {
     name: "HTTPS Proxy",
-    href: "#",
+    href: "/https-proxy",
     icon: Shield,
     active: false,
   },
   {
     name: "Settings",
-    href: "#",
+    href: "/settings",
     icon: Settings,
     active: false,
   },
   {
     name: "Documentation",
-    href: "#",
+    href: "/documentation",
     icon: FileText,
     active: false,
   },

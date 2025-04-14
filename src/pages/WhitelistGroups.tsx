@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { ArrowUpDown, Edit, Plus, Trash, RefreshCw } from "lucide-react";
 import { 
   Table, 
@@ -99,9 +98,9 @@ export default function WhitelistGroups() {
               Refresh
             </Button>
             <Button asChild>
-              <Link to="/whitelist/create">
+              <a href="/whitelist/create">
                 <Plus className="mr-2 h-4 w-4" /> Create Group
-              </Link>
+              </a>
             </Button>
           </div>
         </div>
@@ -180,9 +179,9 @@ export default function WhitelistGroups() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button variant="outline" size="icon" asChild>
-                              <Link to={`/whitelist/${group.id}`}>
+                              <a href={`/whitelist/${group.id}`}>
                                 <Edit className="h-4 w-4" />
-                              </Link>
+                              </a>
                             </Button>
                             <Button 
                               variant="outline" 

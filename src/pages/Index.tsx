@@ -40,7 +40,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <Button asChild>
-            <a href="#">Create Whitelist Group</a>
+            <a href="/whitelist/create">Create Whitelist Group</a>
           </Button>
         </div>
 
@@ -147,7 +147,7 @@ export default function Dashboard() {
               </CardContent>
               <CardFooter className="bg-muted/50 p-2">
                 <Button variant="ghost" size="sm" className="w-full" asChild>
-                  <a href="#" className="flex items-center justify-center gap-1">
+                  <a href={`/whitelist/${group.id}`} className="flex items-center justify-center gap-1">
                     View details
                     <ArrowRight className="h-4 w-4" />
                   </a>
@@ -164,7 +164,7 @@ export default function Dashboard() {
               Create a new whitelist group to manage access control.
             </p>
             <Button asChild>
-              <a href="#">Create Whitelist Group</a>
+              <a href="/whitelist/create">Create Whitelist Group</a>
             </Button>
           </Card>
         </div>

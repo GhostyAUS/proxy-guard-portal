@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Link } from "react-router-dom";
 import { useProxy } from "@/contexts/ProxyContext";
 
 export default function HttpProxy() {
@@ -102,7 +101,7 @@ export default function HttpProxy() {
             </CardContent>
             <CardFooter>
               <Button variant="outline" asChild>
-                <Link to="/documentation">View Documentation</Link>
+                <a href="/documentation">View Documentation</a>
               </Button>
             </CardFooter>
           </Card>
@@ -128,9 +127,9 @@ export default function HttpProxy() {
                           </p>
                         </div>
                         <Button variant="ghost" size="sm" asChild>
-                          <Link to={`/whitelist/${group.id}`}>
+                          <a href={`/whitelist/${group.id}`}>
                             <ArrowRight className="h-4 w-4" />
-                          </Link>
+                          </a>
                         </Button>
                       </div>
                     ))}
@@ -142,7 +141,7 @@ export default function HttpProxy() {
                       Create and enable whitelist groups to allow proxy access
                     </p>
                     <Button asChild>
-                      <Link to="/whitelist/create">Create Whitelist Group</Link>
+                      <a href="/whitelist/create">Create Whitelist Group</a>
                     </Button>
                   </div>
                 )}
@@ -150,9 +149,9 @@ export default function HttpProxy() {
             </CardContent>
             <CardFooter>
               <Button variant="outline" asChild>
-                <Link to="/whitelist">
+                <a href="/whitelist">
                   Manage Whitelist Groups
-                </Link>
+                </a>
               </Button>
             </CardFooter>
           </Card>
